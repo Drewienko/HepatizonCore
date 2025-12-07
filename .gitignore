@@ -52,3 +52,40 @@ compile_commands.json
 *creator.user*
 
 *_qmlcache.qrc
+
+# CMake / Ninja
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+_deps/
+Makefile
+*.ninja
+.ninja_deps
+.ninja_log
+Testing/
+out/
+
+# Visual Studio / MSVC
+.vs/
+*.vcxproj*
+*.sln
+*.opensdf
+*.sdf
+*.suo
+*.ipch
+*.pdb
+*.obj
+*.tlog
+*.lib
+*.exp
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+*.pch
+
+# Editors
+.vscode/
+.idea/
+*.user
