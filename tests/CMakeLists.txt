@@ -4,12 +4,12 @@ if(NOT GTest_FOUND)
 endif()
 
 if(GTest_FOUND)
-    add_executable(onyxcitadel_tests
+    add_executable(hepatizoncore_tests
         unit/sample_test.cpp
     )
-    target_link_libraries(onyxcitadel_tests PRIVATE GTest::gtest GTest::gtest_main onyxcitadel_core)
-    onyc_set_common_warnings(onyxcitadel_tests)
-    add_test(NAME onyxcitadel_tests COMMAND onyxcitadel_tests)
+    target_link_libraries(hepatizoncore_tests PRIVATE GTest::gtest GTest::gtest_main hepatizoncore_core)
+    hepc_set_common_warnings(hepatizoncore_tests)
+    add_test(NAME hepatizoncore_tests COMMAND hepatizoncore_tests)
 else()
     message(STATUS "GTest not found; skipping tests target.")
 endif()

@@ -13,8 +13,8 @@ if (-not (Test-Path $windeployqt)) {
 }
 
 $exeCandidates = @(
-    (Join-Path $BuildDir "$Config/onyxcitadel_gui.exe")
-    (Join-Path $BuildDir "src/$Config/onyxcitadel_gui.exe")
+    (Join-Path $BuildDir "$Config/hepatizoncore_gui.exe")
+    (Join-Path $BuildDir "src/$Config/hepatizoncore_gui.exe")
 )
 $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exePath) {

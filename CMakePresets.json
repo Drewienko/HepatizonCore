@@ -14,7 +14,7 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "ONYC_ENABLE_TESTS": "ON"
+        "HEPC_ENABLE_TESTS": "ON"
       }
     },
     {
@@ -25,7 +25,7 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "ONYC_ENABLE_TESTS": "OFF"
+        "HEPC_ENABLE_TESTS": "OFF"
       }
     },
     {
@@ -37,7 +37,7 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "ONYC_ENABLE_TESTS": "ON"
+        "HEPC_ENABLE_TESTS": "ON"
       }
     },
     {
@@ -49,7 +49,7 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "ONYC_ENABLE_TESTS": "OFF"
+        "HEPC_ENABLE_TESTS": "OFF"
       }
     }
   ],

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-TEST(OnyxCitadelSample, Placeholder)
+TEST(HepatizonCoreSample, Placeholder)
 {
     EXPECT_TRUE(true);
 }

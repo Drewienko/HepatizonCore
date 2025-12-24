@@ -1,6 +1,6 @@
-# OnyxCitadel
+# HepatizonCore
 
-OnyxCitadel is a modular, security-focused password manager in C++20 with both CLI and Qt-based GUI frontends.
+HepatizonCore is a modular, security-focused password manager in C++20 with both CLI and Qt-based GUI frontends.
 
 > Status: early-stage WIP
 
@@ -61,21 +61,21 @@ OnyxCitadel is a modular, security-focused password manager in C++20 with both C
 Prereqs: CMake >= 3.20, a C++20 compiler, and (for GUI) Qt 6.
 
 Presets (see `CMakePresets.json`):
-- Ninja (single-config, Linux/macOS/Windows): `cmake --preset ninja-debug -DONYC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
-- MSVC (Visual Studio 2022): `cmake --preset msvc-debug -DONYC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="C:/Qt/6.10.1/msvc2022_64"`
+- Ninja (single-config, Linux/macOS/Windows): `cmake --preset ninja-debug -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
+- MSVC (Visual Studio 2022): `cmake --preset msvc-debug -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="C:/Qt/6.10.1/msvc2022_64"`
 
 Build:
 - Ninja: `cmake --build --preset ninja-debug`
 - MSVC: `cmake --build --preset msvc-debug --config Debug`
 
 Run:
-- CLI: `out/build/<preset>/[Debug/]onyxcitadel_cli`
-- GUI: `out/build/<preset>/[Debug/]onyxcitadel_gui`
+- CLI: `out/build/<preset>/[Debug/]hepatizoncore_cli`
+- GUI: `out/build/<preset>/[Debug/]hepatizoncore_gui`
 
 ---
 
 ## Tests
-- Configure with `-DONYC_ENABLE_TESTS=ON` (already set in debug presets)
+- Configure with `-DHEPC_ENABLE_TESTS=ON` (already set in debug presets)
 - Run: `ctest --preset ninja-debug` or `ctest --preset msvc-debug --config Debug`
 
 ---
@@ -85,7 +85,7 @@ Use the helper to bundle Qt DLLs/plugins next to the executable:
 ```
 pwsh scripts/windeployqt.ps1 -BuildDir out/build/msvc-debug -Config Debug -QtRoot "C:/Qt/6.10.1/msvc2022_64"
 ```
-This invokes `windeployqt --compiler-runtime` for the built `onyxcitadel_gui.exe`.
+This invokes `windeployqt --compiler-runtime` for the built `hepatizoncore_gui.exe`.
 
 ---
 

@@ -2,6 +2,6 @@
 
 int main()
 {
-    std::cout << "OnyxCitadel CLI stub\n";
+    std::cout << "HepatizonCore CLI stub\n";
     return 0;
 }
