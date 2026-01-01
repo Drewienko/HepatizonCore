@@ -14,11 +14,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(HEPC_BUILD_CLI "Build the CLI application" ON)
 option(HEPC_BUILD_GUI "Build the GUI application (Qt6)" OFF)
 option(HEPC_ENABLE_TESTS "Build tests" OFF)
+option(HEPC_ENABLE_OPENSSL "Enable OpenSSL crypto provider" OFF)
 option(HEPC_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-find_package(OpenSSL REQUIRED)
+if(HEPC_ENABLE_OPENSSL)
+    find_package(OpenSSL REQUIRED)
+endif()
 
 function(hepc_set_common_warnings target)
     if(MSVC)

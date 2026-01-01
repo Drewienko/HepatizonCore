@@ -9,7 +9,7 @@ HepatizonCore is a modular, security-focused password manager in C++20 with both
 ## Key capabilities
 - Hybrid UI: CLI implemented; Qt GUI scaffold (build flag).
 - Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`).
-- KDF: Argon2id wrapper over vendored Monocypher (policy versioned, DoS-capped, aligned work area).
+- KDF: Argon2id via vendored Monocypher (policy versioned, DoS-capped, aligned work area).
 - Dual-engine architecture: crypto/storage adapters are scaffolded; educational engine + storage/2FA features are planned.
 
 ---
@@ -17,30 +17,31 @@ HepatizonCore is a modular, security-focused password manager in C++20 with both
 ## Tech stack
 - Language: C++20
 - Build: CMake
-- GUI: Qt 6
+- GUI: Qt 6.10.1
 - Data: SQLite3 (SQLCipher), nlohmann/json
-- Crypto: Monocypher (vendored, KDF/native), OpenSSL (adapter target)
+- Crypto: Monocypher (vendored; native + KDF), OpenSSL (optional adapter)
 - Tests: Google Test
 
 ---
 
 ## Architecture (conceptual)
 ```
-[ UI / CLI / GUI ]
+[ CLI / GUI ] (composition roots)
         |
         v
-[ CORE LOGIC LAYER ]
-    |-- Session Manager (inactivity enforcement)
-    |-- Use cases / Auth flow
+[ HepatizonCore ]
         |
         v
-[ PORTS (Interfaces in include/hepatizon) ]
-    |                                   |
-    v                                   v
-[ ICryptoProvider ]              [ IStorageRepository ]
-    |-- native engine                |-- sqlite (SQLCipher)
-    |-- OpenSSL adapter              |-- json file adapter
+[ Ports (include/hepatizon) ]
+  |-- ICryptoProvider  <--- HepatizonNative / HepatizonOpenSSL
+  |-- IStorageRepository <--- storage adapters (SQLite/JSON/...)
+
+Security primitives (secure wipe, secure random, secure containers) are always available to core and adapters.
+
+KDF is implemented once (Monocypher Argon2id) and shared by crypto providers.
 ```
+
+For the target-level structure and dependency rules, see `STRUCTURE.md`.
 
 ---
 
@@ -91,14 +92,14 @@ HepatizonCore/
 ---
 
 ## Building
-Prereqs: CMake >= 3.20, a C++20 compiler, and (for GUI) Qt 6.
+Prereqs: CMake >= 3.20, a C++20 compiler, and (for GUI) Qt 6.10.1.
 
-Note: OpenSSL is currently required by the build (an OpenSSL adapter target is always configured).
+Note: OpenSSL is optional. Enable the OpenSSL provider with `-DHEPC_ENABLE_OPENSSL=ON` (requires OpenSSL).
 
 Quick start (vcpkg submodule):
-- Clone with submodules: `git clone --recursive https://github.com/TwojNick/HepatizonCore`
+- Clone with submodules: `git clone --recursive https://github.com/Drewienko/HepatizonCore`
   - If already cloned: `git submodule update --init --recursive`
-- Linux/macOS:
+- Linux:
   - `./vcpkg/bootstrap-vcpkg.sh`
   - `cmake --preset linux-release-gcc`
   - `cmake --build --preset linux-release-gcc`
@@ -110,9 +111,9 @@ Quick start (vcpkg submodule):
 Vcpkg is pinned via the submodule commit and `vcpkg-configuration.json`.
 
 Presets (see `CMakePresets.json`):
-- Linux GCC: `cmake --preset linux-release-gcc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
-- Linux Clang: `cmake --preset linux-release-clang -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
-- Windows MSVC (Visual Studio 2022): `cmake --preset windows-release-msvc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="C:/Qt/6.10.1/msvc2022_64"`
+- Linux GCC: `cmake --preset linux-release-gcc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="path/to/your/qt/6.10.1/gcc_64"`
+- Linux Clang: `cmake --preset linux-release-clang -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="path/to/your/qt/6.10.1/gcc_64"`
+- Windows MSVC (Visual Studio 2022): `cmake --preset windows-release-msvc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="path/to/your/qt/6.10.1/msvc2022_64"`
 
 Build:
 - Linux GCC: `cmake --build --preset linux-release-gcc`

@@ -1,4 +1,4 @@
-#include "hepatizon/security/KeyDerivation.hpp"
+#include "hepatizon/crypto/KeyDerivation.hpp"
 
 #include "hepatizon/security/ZeroAllocator.hpp"
 #include "monocypher.h"
@@ -9,11 +9,12 @@
 #include <stdexcept>
 #include <vector>
 
-namespace hepatizon::security
+namespace hepatizon::crypto
 {
 
-[[nodiscard]] SecureBuffer deriveMasterKeyArgon2id(std::span<const std::byte> password, std::span<const std::byte> salt,
-                                                   Argon2idParams params)
+[[nodiscard]] hepatizon::security::SecureBuffer deriveMasterKeyArgon2id(std::span<const std::byte> password,
+                                                                       std::span<const std::byte> salt,
+                                                                       Argon2idParams params)
 {
     if (password.empty())
     {
@@ -53,9 +54,9 @@ namespace hepatizon::security
         throw std::bad_alloc{};
     }
     const std::size_t workWords{ static_cast<std::size_t>(params.memoryKiB) * kU64WordsPerKiB };
-    std::vector<std::uint64_t, ZeroAllocator<std::uint64_t>> workArea(workWords);
+    std::vector<std::uint64_t, hepatizon::security::ZeroAllocator<std::uint64_t>> workArea(workWords);
 
-    SecureBuffer masterKey;
+    hepatizon::security::SecureBuffer masterKey;
     masterKey.resize(g_kMasterKeyBytes);
     if (masterKey.size() > std::numeric_limits<std::uint32_t>::max())
     {
@@ -77,10 +78,10 @@ namespace hepatizon::security
     return masterKey;
 }
 
-[[nodiscard]] SecureBuffer deriveMasterKeyArgon2idDefault(std::span<const std::byte> password,
-                                                          std::span<const std::byte> salt)
+[[nodiscard]] hepatizon::security::SecureBuffer deriveMasterKeyArgon2idDefault(std::span<const std::byte> password,
+                                                                              std::span<const std::byte> salt)
 {
     return deriveMasterKeyArgon2id(password, salt, g_kArgon2idDefaultParams);
 }
 
-} // namespace hepatizon::security
+} // namespace hepatizon::crypto
