@@ -7,98 +7,166 @@
   },
   "configurePresets": [
     {
-      "name": "ninja-debug",
-      "displayName": "Ninja - Debug",
-      "description": "Single-config build for Linux/macOS/Windows with Ninja",
+      "name": "linux-debug-gcc",
+      "displayName": "Linux Debug (GCC + Ninja)",
+      "description": "Single-config debug build with GCC",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "HEPC_ENABLE_TESTS": "ON"
+        "HEPC_ENABLE_TESTS": "ON",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
     },
     {
-      "name": "ninja-release",
-      "displayName": "Ninja - Release",
-      "description": "Single-config release build with Ninja",
+      "name": "linux-release-gcc",
+      "displayName": "Linux Release (GCC + Ninja)",
+      "description": "Single-config release build with GCC",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "HEPC_ENABLE_TESTS": "OFF"
+        "HEPC_ENABLE_TESTS": "OFF",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
     },
     {
-      "name": "msvc-debug",
-      "displayName": "MSVC 2022 - Debug",
-      "description": "Multi-config build for Windows with Visual Studio 2022",
+      "name": "linux-debug-clang",
+      "displayName": "Linux Debug (Clang + Ninja)",
+      "description": "Single-config debug build with Clang",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HEPC_ENABLE_TESTS": "ON",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
+    },
+    {
+      "name": "linux-release-clang",
+      "displayName": "Linux Release (Clang + Ninja)",
+      "description": "Single-config release build with Clang",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "HEPC_ENABLE_TESTS": "OFF",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
+    },
+    {
+      "name": "windows-debug-msvc",
+      "displayName": "Windows Debug (MSVC 2022)",
+      "description": "Multi-config debug build with Visual Studio 2022",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "HEPC_ENABLE_TESTS": "ON"
+        "HEPC_ENABLE_TESTS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
     },
     {
-      "name": "msvc-release",
-      "displayName": "MSVC 2022 - Release",
-      "description": "Multi-config release build for Windows with Visual Studio 2022",
+      "name": "windows-release-msvc",
+      "displayName": "Windows Release (MSVC 2022)",
+      "description": "Multi-config release build with Visual Studio 2022",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "HEPC_ENABLE_TESTS": "OFF"
+        "HEPC_ENABLE_TESTS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "ninja-debug",
-      "configurePreset": "ninja-debug"
+      "name": "linux-debug-gcc",
+      "configurePreset": "linux-debug-gcc"
     },
     {
-      "name": "ninja-release",
-      "configurePreset": "ninja-release"
+      "name": "linux-release-gcc",
+      "configurePreset": "linux-release-gcc"
     },
     {
-      "name": "msvc-debug",
-      "configurePreset": "msvc-debug",
+      "name": "linux-debug-clang",
+      "configurePreset": "linux-debug-clang"
+    },
+    {
+      "name": "linux-release-clang",
+      "configurePreset": "linux-release-clang"
+    },
+    {
+      "name": "windows-debug-msvc",
+      "configurePreset": "windows-debug-msvc",
       "configuration": "Debug"
     },
     {
-      "name": "msvc-release",
-      "configurePreset": "msvc-release",
+      "name": "windows-release-msvc",
+      "configurePreset": "windows-release-msvc",
       "configuration": "Release"
     }
   ],
   "testPresets": [
     {
-      "name": "ninja-debug",
-      "configurePreset": "ninja-debug",
+      "name": "linux-debug-gcc",
+      "configurePreset": "linux-debug-gcc",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "ninja-release",
-      "configurePreset": "ninja-release",
+      "name": "linux-release-gcc",
+      "configurePreset": "linux-release-gcc",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "msvc-debug",
-      "configurePreset": "msvc-debug",
+      "name": "linux-debug-clang",
+      "configurePreset": "linux-debug-clang",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-release-clang",
+      "configurePreset": "linux-release-clang",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-debug-msvc",
+      "configurePreset": "windows-debug-msvc",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "msvc-release",
-      "configurePreset": "msvc-release",
+      "name": "windows-release-msvc",
+      "configurePreset": "windows-release-msvc",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true

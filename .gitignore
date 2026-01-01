@@ -65,6 +65,7 @@ Makefile
 .ninja_log
 Testing/
 out/
+vcpkg_installed/
 
 # Visual Studio / MSVC
 .vs/
@@ -89,3 +90,10 @@ out/
 .vscode/
 .idea/
 *.user
+
+.cache/
+
+# Personal project notes (not tracked)
+AGENTS.md
+NOTES.md
+RESEARCH.md

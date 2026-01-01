@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(HepatizonCore
     VERSION 0.0.1
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 20)
@@ -18,6 +18,8 @@ option(HEPC_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+find_package(OpenSSL REQUIRED)
+
 function(hepc_set_common_warnings target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4)
@@ -32,6 +34,7 @@ function(hepc_set_common_warnings target)
     endif()
 endfunction()
 
+add_subdirectory(third_party/monocypher)
 add_subdirectory(src)
 
 if(HEPC_ENABLE_TESTS)

@@ -1,0 +1,13 @@
+CompileFlags:
+  CompilationDatabase: out/build/linux-debug-gcc
+  Add:
+    - "-std=c++20"
+    - "-Wall"
+  Remove:
+    - "-fpreleveled-symbols"
+    - "-fno-canonical-system-headers"
+
+Diagnostics:
+  Suppress:
+    - drv_unknown_argument
+    - pp_file_not_found

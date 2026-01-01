@@ -2,16 +2,15 @@
 
 HepatizonCore is a modular, security-focused password manager in C++20 with both CLI and Qt-based GUI frontends.
 
-> Status: early-stage WIP
+> Status (2026-01-01): early-stage WIP — security primitives + Argon2id KDF implemented; storage/adapters and GUI are in progress.
 
 ---
 
 ## Key capabilities
-- Hybrid UI: full CLI for power users/automation, Qt GUI for desktop use.
-- Dual crypto engines (strategy pattern): educational (handwritten AES-256/ChaCha20/SHA-256) and production (OpenSSL/Libsodium wrappers).
-- Hardware-backed 2FA: USB keyfile + disk identifier with challenge-response; database unlocks only when the key drive is present.
-- Storage abstraction: SQLite (SQLCipher), remote SQL (MySQL/PostgreSQL via ODBC/SOCI), JSON/binary flat files for export/debug.
-- Import/migration: CSV/JSON/XLSX import, browser password extraction (Chrome/Firefox local storage parsing).
+- Hybrid UI: CLI implemented; Qt GUI scaffold (build flag).
+- Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`).
+- KDF: Argon2id wrapper over vendored Monocypher (policy versioned, DoS-capped, aligned work area).
+- Dual-engine architecture: crypto/storage adapters are scaffolded; educational engine + storage/2FA features are planned.
 
 ---
 
@@ -19,71 +18,124 @@ HepatizonCore is a modular, security-focused password manager in C++20 with both
 - Language: C++20
 - Build: CMake
 - GUI: Qt 6
-- Data: SQLite3, SOCI/ODBC, nlohmann/json, OpenXLSX
+- Data: SQLite3 (SQLCipher), nlohmann/json
+- Crypto: Monocypher (vendored, KDF/native), OpenSSL (adapter target)
 - Tests: Google Test
 
 ---
 
 ## Architecture (conceptual)
 ```
-[ UI LAYER ]
-    |-- CLI Application (Console)
-    |-- GUI Application (Qt Window)
-         |
-         v
-[ CORE LOGIC LAYER (Controller) ]
-    |-- Session Manager (Auto-logout, Clipboard clear)
-    |-- Import/Export Manager
-         |
-         v
-[ ABSTRACTION LAYER (Interfaces) ]
+[ UI / CLI / GUI ]
+        |
+        v
+[ CORE LOGIC LAYER ]
+    |-- Session Manager (inactivity enforcement)
+    |-- Use cases / Auth flow
+        |
+        v
+[ PORTS (Interfaces in include/hepatizon) ]
     |                                   |
     v                                   v
 [ ICryptoProvider ]              [ IStorageRepository ]
-    |-- NativeAESImpl                |-- SQLiteRepository
-    |-- NativeChaChaImpl             |-- RemoteSQLRepository
-    |-- OpenSSLWrapper               |-- JsonFileRepository
+    |-- native engine                |-- sqlite (SQLCipher)
+    |-- OpenSSL adapter              |-- json file adapter
 ```
 
 ---
 
 ## Project layout (WIP)
-- `src/` core, crypto, storage, security, ui (cli/gui), utils
-- `include/` public interfaces
+- `include/hepatizon/` public interfaces and shared types
+- `src/` implementations (core, crypto, storage, security, ui, platform)
+- `third_party/` vendored dependencies (e.g., Monocypher)
 - `resources/` assets (icons), styles, translations
 - `tests/` unit, integration, fixtures (GTest)
 - `scripts/` helpers (e.g., windeployqt)
-- `cmake/modules/` custom CMake helpers
+
+Example layout:
+```
+HepatizonCore/
+├── include/
+│   └── hepatizon/
+│       ├── core/
+│       ├── crypto/
+│       ├── storage/
+│       └── security/
+├── third_party/
+│   └── monocypher/
+├── vcpkg/
+├── src/
+│   ├── core/
+│   ├── crypto/
+│   │   ├── native/
+│   │   └── openssl/
+│   ├── storage/
+│   │   ├── sqlite/
+│   │   └── json/
+│   ├── security/
+│   ├── ui/
+│   │   ├── cli/
+│   │   └── gui/
+│   └── platform/
+└── tests/
+    ├── unit/
+    └── integration/
+```
+
+## Session + security policy (current)
+- Inactivity timeout is enforced inside core. UI sends activity signals and may run a timer for UX.
+- Clipboard clear is handled by UI/platform code on logout/expiry.
+- SecureBuffer lives in public headers; OS-specific secure wipe lives in src/security to avoid platform headers in include/.
+- Monocypher is vendored in `third_party/monocypher/` and included privately by implementation `.cpp` files.
 
 ---
 
 ## Building
 Prereqs: CMake >= 3.20, a C++20 compiler, and (for GUI) Qt 6.
 
+Note: OpenSSL is currently required by the build (an OpenSSL adapter target is always configured).
+
+Quick start (vcpkg submodule):
+- Clone with submodules: `git clone --recursive https://github.com/TwojNick/HepatizonCore`
+  - If already cloned: `git submodule update --init --recursive`
+- Linux/macOS:
+  - `./vcpkg/bootstrap-vcpkg.sh`
+  - `cmake --preset linux-release-gcc`
+  - `cmake --build --preset linux-release-gcc`
+- Windows (PowerShell):
+  - `.\vcpkg\bootstrap-vcpkg.bat`
+  - `cmake --preset windows-release-msvc`
+  - `cmake --build --preset windows-release-msvc --config Release`
+
+Vcpkg is pinned via the submodule commit and `vcpkg-configuration.json`.
+
 Presets (see `CMakePresets.json`):
-- Ninja (single-config, Linux/macOS/Windows): `cmake --preset ninja-debug -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
-- MSVC (Visual Studio 2022): `cmake --preset msvc-debug -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="C:/Qt/6.10.1/msvc2022_64"`
+- Linux GCC: `cmake --preset linux-release-gcc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
+- Linux Clang: `cmake --preset linux-release-clang -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="/opt/Qt/6.x/gcc_64"`
+- Windows MSVC (Visual Studio 2022): `cmake --preset windows-release-msvc -DHEPC_BUILD_GUI=ON -DCMAKE_PREFIX_PATH="C:/Qt/6.10.1/msvc2022_64"`
 
 Build:
-- Ninja: `cmake --build --preset ninja-debug`
-- MSVC: `cmake --build --preset msvc-debug --config Debug`
+- Linux GCC: `cmake --build --preset linux-release-gcc`
+- Linux Clang: `cmake --build --preset linux-release-clang`
+- Windows MSVC: `cmake --build --preset windows-release-msvc --config Release`
 
 Run:
-- CLI: `out/build/<preset>/[Debug/]hepatizoncore_cli`
-- GUI: `out/build/<preset>/[Debug/]hepatizoncore_gui`
+- CLI: `out/build/<preset>/src/ui/hepatizoncore_cli`
+- GUI: `out/build/<preset>/src/ui/hepatizoncore_gui`
 
 ---
 
 ## Tests
 - Configure with `-DHEPC_ENABLE_TESTS=ON` (already set in debug presets)
-- Run: `ctest --preset ninja-debug` or `ctest --preset msvc-debug --config Debug`
+- Run: `ctest --preset linux-debug-gcc`, `ctest --preset linux-debug-clang`, or `ctest --preset windows-debug-msvc --config Debug`
+- Slow KDF tests: set `HEPC_RUN_SLOW_TESTS=1` before running `ctest`
 
 ---
 
 ## Deploying Qt GUI on Windows
 Use the helper to bundle Qt DLLs/plugins next to the executable:
 ```
-pwsh scripts/windeployqt.ps1 -BuildDir out/build/msvc-debug -Config Debug -QtRoot "C:/Qt/6.10.1/msvc2022_64"
+pwsh scripts/windeployqt.ps1 -BuildDir out/build/windows-release-msvc -Config Release -QtRoot "C:/Qt/6.10.1/msvc2022_64"
 ```
 This invokes `windeployqt --compiler-runtime` for the built `hepatizoncore_gui.exe`.
 
