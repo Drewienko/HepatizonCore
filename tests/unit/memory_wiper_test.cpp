@@ -12,7 +12,9 @@ namespace
 
 struct NonTrivial
 {
-    ~NonTrivial() { }
+    ~NonTrivial()
+    {
+    }
 };
 
 template <typename T>
@@ -25,13 +27,13 @@ static_assert(!CanSecureWipe<std::span<NonTrivial>>);
 
 TEST(MemoryWiper, ZerosByteSpan)
 {
-    constexpr std::size_t byteCount{64U};
-    constexpr std::byte nonZeroByte{std::byte{0xA5}};
+    constexpr std::size_t byteCount{ 64U };
+    constexpr std::byte nonZeroByte{ std::byte{ 0xA5 } };
 
     std::array<std::byte, byteCount> bytes{};
     bytes.fill(nonZeroByte);
 
-    hepatizon::security::secureWipe(std::span{bytes});
+    hepatizon::security::secureWipe(std::span{ bytes });
 
     for (const auto b : bytes)
     {
@@ -41,13 +43,13 @@ TEST(MemoryWiper, ZerosByteSpan)
 
 TEST(MemoryWiper, ZerosTypedSpanViaTemplate)
 {
-    constexpr std::size_t wordCount{16U};
-    constexpr std::uint32_t nonZeroWord{0xDEADBEEFU};
+    constexpr std::size_t wordCount{ 16U };
+    constexpr std::uint32_t nonZeroWord{ 0xDEADBEEFU };
 
     std::array<std::uint32_t, wordCount> words{};
     words.fill(nonZeroWord);
 
-    const std::span<std::uint32_t> wordsSpan{words};
+    const std::span<std::uint32_t> wordsSpan{ words };
     hepatizon::security::secureWipe(wordsSpan);
 
     for (const auto b : std::as_bytes(wordsSpan))

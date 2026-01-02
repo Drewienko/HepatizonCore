@@ -1,0 +1,354 @@
+#include "hepatizon/crypto/providers/OpenSslProviderFactory.hpp"
+#include "hepatizon/security/SecureBuffer.hpp"
+#include "hepatizon/security/SecureRandom.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/kdf.h>
+#include <openssl/params.h>
+#include <optional>
+#include <span>
+#include <stdexcept>
+#include <vector>
+
+namespace hepatizon::crypto::providers
+{
+namespace
+{
+
+constexpr const char* g_kKdfParamArgon2Memcost{ "memcost" };
+constexpr const char* g_kKdfParamArgon2Lanes{ "lanes" };
+constexpr const char* g_kKdfParamThreads{ "threads" };
+constexpr const char* g_kKdfParamArgon2Version{ "version" };
+
+std::span<const std::uint8_t> asU8(std::span<const std::byte> s) noexcept
+{
+    return { reinterpret_cast<const std::uint8_t*>(s.data()), s.size() };
+}
+
+void requireExactSize(std::span<const std::uint8_t> s, std::size_t expected, const char* what)
+{
+    if (s.size() != expected)
+    {
+        throw std::invalid_argument(what);
+    }
+}
+
+void requirePolicySupported(const hepatizon::crypto::KdfMetadata& meta)
+{
+    if (meta.policyVersion != hepatizon::crypto::g_kKdfPolicyVersion)
+    {
+        throw std::invalid_argument("deriveMasterKey: unsupported policyVersion");
+    }
+    if (meta.algorithm != hepatizon::crypto::KdfAlgorithm::Argon2id)
+    {
+        throw std::invalid_argument("deriveMasterKey: unsupported algorithm");
+    }
+    if (meta.argon2Version != hepatizon::crypto::g_kArgon2VersionV13)
+    {
+        throw std::invalid_argument("deriveMasterKey: unsupported Argon2 version");
+    }
+    if (meta.derivedKeyBytes != hepatizon::crypto::g_kMasterKeyBytes)
+    {
+        throw std::invalid_argument("deriveMasterKey: unsupported derivedKeyBytes");
+    }
+}
+
+void requireArgon2idParamsSafe(const hepatizon::crypto::Argon2idParams& params)
+{
+    if (params.iterations == 0U || params.parallelism == 0U)
+    {
+        throw std::invalid_argument("deriveMasterKey: invalid Argon2id parameters");
+    }
+
+    constexpr std::uint32_t parallelismCap{ 16U };
+    constexpr std::uint32_t memoryKiBCap{ 1024U * 1024U };
+    constexpr std::uint32_t iterationsCap{ 10U };
+    if (params.parallelism > parallelismCap || params.memoryKiB > memoryKiBCap || params.iterations > iterationsCap)
+    {
+        throw std::invalid_argument("deriveMasterKey: unsafe Argon2id parameters");
+    }
+
+    const std::uint32_t minMemoryKiB{ params.parallelism * 8U };
+    if (params.memoryKiB < minMemoryKiB)
+    {
+        throw std::invalid_argument("deriveMasterKey: invalid Argon2id parameters");
+    }
+
+    const std::uint32_t memoryMultiple{ params.parallelism * 4U };
+    if ((params.memoryKiB % memoryMultiple) != 0U)
+    {
+        throw std::invalid_argument("deriveMasterKey: invalid Argon2id parameters");
+    }
+}
+
+using EvpKdfPtr = std::unique_ptr<EVP_KDF, decltype(&EVP_KDF_free)>;
+using EvpKdfCtxPtr = std::unique_ptr<EVP_KDF_CTX, decltype(&EVP_KDF_CTX_free)>;
+using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+
+EvpKdfPtr fetchArgon2idKdf()
+{
+    if (EVP_KDF* kdf = EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr); kdf != nullptr)
+    {
+        return EvpKdfPtr{ kdf, &EVP_KDF_free };
+    }
+    return EvpKdfPtr{ nullptr, &EVP_KDF_free };
+}
+
+class OpenSslCryptoProvider final : public hepatizon::crypto::ICryptoProvider
+{
+public:
+    OpenSslCryptoProvider() : m_argon2idKdf{ fetchArgon2idKdf() }
+    {
+    }
+
+    [[nodiscard]] hepatizon::security::SecureBuffer
+    deriveMasterKey(std::span<const std::byte> password, const hepatizon::crypto::KdfMetadata& meta) const override
+    {
+        if (password.empty())
+        {
+            throw std::invalid_argument("deriveMasterKey: empty password");
+        }
+        requirePolicySupported(meta);
+        requireArgon2idParamsSafe(meta.argon2id);
+
+        if (!m_argon2idKdf)
+        {
+            throw std::runtime_error("deriveMasterKey: OpenSSL Argon2id KDF not available");
+        }
+
+        EvpKdfCtxPtr ctx{ EVP_KDF_CTX_new(m_argon2idKdf.get()), &EVP_KDF_CTX_free };
+        if (!ctx)
+        {
+            throw std::runtime_error("deriveMasterKey: EVP_KDF_CTX_new failed");
+        }
+
+        std::uint32_t iter = meta.argon2id.iterations;
+        std::uint32_t memcostKiB = meta.argon2id.memoryKiB;
+        std::uint32_t lanes = meta.argon2id.parallelism;
+        std::uint32_t threads = meta.argon2id.parallelism;
+        std::uint32_t version = meta.argon2Version;
+
+        // OSSL_PARAM wants non-const pointers for octet strings.
+        auto* passPtr = const_cast<std::uint8_t*>(asU8(password).data());
+        auto* saltPtr = const_cast<std::uint8_t*>(meta.salt.data());
+
+        OSSL_PARAM params[]{
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, passPtr, password.size()),
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, saltPtr, meta.salt.size()),
+            OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ITER, &iter),
+            OSSL_PARAM_construct_uint32(g_kKdfParamArgon2Memcost, &memcostKiB),
+            OSSL_PARAM_construct_uint32(g_kKdfParamArgon2Lanes, &lanes),
+            OSSL_PARAM_construct_uint32(g_kKdfParamThreads, &threads),
+            OSSL_PARAM_construct_uint32(g_kKdfParamArgon2Version, &version),
+            OSSL_PARAM_construct_end(),
+        };
+
+        hepatizon::security::SecureBuffer out{};
+        out.resize(meta.derivedKeyBytes);
+        if (EVP_KDF_derive(ctx.get(), out.data(), out.size(), params) <= 0)
+        {
+            throw std::runtime_error("deriveMasterKey: EVP_KDF_derive failed");
+        }
+        return out;
+    }
+
+    [[nodiscard]] bool randomBytes(std::span<std::uint8_t> out) noexcept override
+    {
+        return hepatizon::security::secureRandomFill(out);
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox aeadEncrypt(std::span<const std::uint8_t> key,
+                                                         std::span<const std::byte> plainText,
+                                                         std::span<const std::byte> associatedData) override
+    {
+        requireExactSize(key, hepatizon::crypto::g_aeadKeyBytes, "aeadEncrypt: key");
+        if (plainText.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        {
+            throw std::invalid_argument("aeadEncrypt: plainText too large");
+        }
+        if (associatedData.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        {
+            throw std::invalid_argument("aeadEncrypt: associatedData too large");
+        }
+
+        hepatizon::crypto::AeadBox box{};
+        if (!randomBytes(std::span<std::uint8_t>{ box.nonce }))
+        {
+            throw std::runtime_error("aeadEncrypt: CSPRNG failure");
+        }
+
+        EvpCipherCtxPtr ctx{ EVP_CIPHER_CTX_new(), &EVP_CIPHER_CTX_free };
+        if (!ctx)
+        {
+            throw std::runtime_error("aeadEncrypt: EVP_CIPHER_CTX_new failed");
+        }
+
+        if (EVP_EncryptInit_ex(ctx.get(), EVP_chacha20_poly1305(), nullptr, nullptr, nullptr) != 1)
+        {
+            throw std::runtime_error("aeadEncrypt: EVP_EncryptInit_ex failed");
+        }
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_IVLEN, static_cast<int>(box.nonce.size()), nullptr) != 1)
+        {
+            throw std::runtime_error("aeadEncrypt: set ivlen failed");
+        }
+        if (EVP_EncryptInit_ex(ctx.get(), nullptr, nullptr, key.data(), box.nonce.data()) != 1)
+        {
+            throw std::runtime_error("aeadEncrypt: set key/nonce failed");
+        }
+
+        int len = 0;
+        const auto ad = asU8(associatedData);
+        if (!ad.empty())
+        {
+            if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, ad.data(), static_cast<int>(ad.size())) != 1)
+            {
+                throw std::runtime_error("aeadEncrypt: add aad failed");
+            }
+        }
+
+        box.cipherText.resize(plainText.size());
+        const auto pt = asU8(plainText);
+        int outLen = 0;
+        if (!pt.empty())
+        {
+            if (EVP_EncryptUpdate(ctx.get(), box.cipherText.data(), &outLen, pt.data(), static_cast<int>(pt.size())) !=
+                1)
+            {
+                throw std::runtime_error("aeadEncrypt: encrypt update failed");
+            }
+        }
+        if (outLen < 0 || static_cast<std::size_t>(outLen) > box.cipherText.size())
+        {
+            throw std::runtime_error("aeadEncrypt: invalid output length");
+        }
+        int finalLen = 0;
+        if (EVP_EncryptFinal_ex(ctx.get(), box.cipherText.data() + outLen, &finalLen) != 1)
+        {
+            throw std::runtime_error("aeadEncrypt: encrypt final failed");
+        }
+        if (finalLen < 0)
+        {
+            throw std::runtime_error("aeadEncrypt: invalid output length");
+        }
+        const std::size_t totalBytes{ static_cast<std::size_t>(outLen) + static_cast<std::size_t>(finalLen) };
+        if (totalBytes > box.cipherText.size())
+        {
+            throw std::runtime_error("aeadEncrypt: invalid output length");
+        }
+        box.cipherText.resize(totalBytes);
+
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_GET_TAG, static_cast<int>(box.tag.size()), box.tag.data()) !=
+            1)
+        {
+            throw std::runtime_error("aeadEncrypt: get tag failed");
+        }
+
+        return box;
+    }
+
+    [[nodiscard]] std::optional<hepatizon::security::SecureBuffer>
+    aeadDecrypt(std::span<const std::uint8_t> key, const hepatizon::crypto::AeadBox& box,
+                std::span<const std::byte> associatedData) override
+    {
+        requireExactSize(key, hepatizon::crypto::g_aeadKeyBytes, "aeadDecrypt: key");
+        if (associatedData.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        {
+            throw std::invalid_argument("aeadDecrypt: associatedData too large");
+        }
+        if (box.cipherText.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        {
+            throw std::invalid_argument("aeadDecrypt: cipherText too large");
+        }
+
+        EvpCipherCtxPtr ctx{ EVP_CIPHER_CTX_new(), &EVP_CIPHER_CTX_free };
+        if (!ctx)
+        {
+            throw std::runtime_error("aeadDecrypt: EVP_CIPHER_CTX_new failed");
+        }
+
+        if (EVP_DecryptInit_ex(ctx.get(), EVP_chacha20_poly1305(), nullptr, nullptr, nullptr) != 1)
+        {
+            throw std::runtime_error("aeadDecrypt: EVP_DecryptInit_ex failed");
+        }
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_IVLEN, static_cast<int>(box.nonce.size()), nullptr) != 1)
+        {
+            throw std::runtime_error("aeadDecrypt: set ivlen failed");
+        }
+        if (EVP_DecryptInit_ex(ctx.get(), nullptr, nullptr, key.data(), box.nonce.data()) != 1)
+        {
+            throw std::runtime_error("aeadDecrypt: set key/nonce failed");
+        }
+
+        int len = 0;
+        const auto ad = asU8(associatedData);
+        if (!ad.empty())
+        {
+            if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, ad.data(), static_cast<int>(ad.size())) != 1)
+            {
+                throw std::runtime_error("aeadDecrypt: add aad failed");
+            }
+        }
+
+        hepatizon::security::SecureBuffer plainText{};
+        plainText.resize(box.cipherText.size());
+
+        int outLen = 0;
+        if (!box.cipherText.empty())
+        {
+            if (EVP_DecryptUpdate(ctx.get(), plainText.data(), &outLen, box.cipherText.data(),
+                                  static_cast<int>(box.cipherText.size())) != 1)
+            {
+                hepatizon::security::secureRelease(plainText);
+                return std::nullopt;
+            }
+        }
+        if (outLen < 0 || static_cast<std::size_t>(outLen) > plainText.size())
+        {
+            hepatizon::security::secureRelease(plainText);
+            return std::nullopt;
+        }
+
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(box.tag.size()),
+                                const_cast<std::uint8_t*>(box.tag.data())) != 1)
+        {
+            throw std::runtime_error("aeadDecrypt: set tag failed");
+        }
+
+        int finalLen = 0;
+        if (EVP_DecryptFinal_ex(ctx.get(), plainText.data() + outLen, &finalLen) != 1)
+        {
+            hepatizon::security::secureRelease(plainText);
+            return std::nullopt;
+        }
+        if (finalLen < 0)
+        {
+            hepatizon::security::secureRelease(plainText);
+            return std::nullopt;
+        }
+        const std::size_t totalBytes{ static_cast<std::size_t>(outLen) + static_cast<std::size_t>(finalLen) };
+        if (totalBytes > plainText.size())
+        {
+            hepatizon::security::secureRelease(plainText);
+            return std::nullopt;
+        }
+        plainText.resize(totalBytes);
+
+        return plainText;
+    }
+
+private:
+    EvpKdfPtr m_argon2idKdf{ nullptr, &EVP_KDF_free };
+};
+
+} // namespace
+
+[[nodiscard]] std::unique_ptr<hepatizon::crypto::ICryptoProvider> makeOpenSslCryptoProvider()
+{
+    return std::make_unique<OpenSslCryptoProvider>();
+}
+
+} // namespace hepatizon::crypto::providers

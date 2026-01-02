@@ -9,10 +9,10 @@
 namespace
 {
 
-constexpr std::size_t bufferSize{32U};
-constexpr std::uint8_t nonZeroByte{0xA5U};
+constexpr std::size_t g_bufferSize{ 32U };
+constexpr std::uint8_t g_nonZeroByte{ 0xA5U };
 
-void expectAllBytesEq(const std::array<std::uint8_t, bufferSize>& buffer, std::uint8_t expected)
+void expectAllBytesEq(const std::array<std::uint8_t, g_bufferSize>& buffer, std::uint8_t expected)
 {
     for (const auto b : buffer)
     {
@@ -24,13 +24,13 @@ void expectAllBytesEq(const std::array<std::uint8_t, bufferSize>& buffer, std::u
 
 TEST(ScopeWipe, WipesOnDestruction)
 {
-    std::array<std::uint8_t, bufferSize> buffer{};
-    buffer.fill(nonZeroByte);
+    std::array<std::uint8_t, g_bufferSize> buffer{};
+    buffer.fill(g_nonZeroByte);
 
     {
-        const auto guard = hepatizon::security::scopeWipe(std::span{buffer});
+        const auto guard = hepatizon::security::scopeWipe(std::span{ buffer });
         (void)guard;
-        expectAllBytesEq(buffer, nonZeroByte);
+        expectAllBytesEq(buffer, g_nonZeroByte);
     }
 
     expectAllBytesEq(buffer, std::uint8_t{});
@@ -38,24 +38,24 @@ TEST(ScopeWipe, WipesOnDestruction)
 
 TEST(ScopeWipe, ReleaseDisablesWipe)
 {
-    std::array<std::uint8_t, bufferSize> buffer{};
-    buffer.fill(nonZeroByte);
+    std::array<std::uint8_t, g_bufferSize> buffer{};
+    buffer.fill(g_nonZeroByte);
 
     {
-        auto guard = hepatizon::security::scopeWipe(std::span{buffer});
+        auto guard = hepatizon::security::scopeWipe(std::span{ buffer });
         guard.release();
     }
 
-    expectAllBytesEq(buffer, nonZeroByte);
+    expectAllBytesEq(buffer, g_nonZeroByte);
 }
 
 TEST(ScopeWipe, MoveTransfersWipeResponsibility)
 {
-    std::array<std::uint8_t, bufferSize> buffer{};
-    buffer.fill(nonZeroByte);
+    std::array<std::uint8_t, g_bufferSize> buffer{};
+    buffer.fill(g_nonZeroByte);
 
     {
-        auto a = hepatizon::security::scopeWipe(std::span{buffer});
+        auto a = hepatizon::security::scopeWipe(std::span{ buffer });
         auto b = std::move(a);
         (void)b;
     }
@@ -65,21 +65,20 @@ TEST(ScopeWipe, MoveTransfersWipeResponsibility)
 
 TEST(ScopeWipe, MoveAssignmentWipesOldThenTakesOver)
 {
-    std::array<std::uint8_t, bufferSize> first{};
-    std::array<std::uint8_t, bufferSize> second{};
-    first.fill(nonZeroByte);
-    second.fill(nonZeroByte);
+    std::array<std::uint8_t, g_bufferSize> first{};
+    std::array<std::uint8_t, g_bufferSize> second{};
+    first.fill(g_nonZeroByte);
+    second.fill(g_nonZeroByte);
 
     {
-        auto guardA = hepatizon::security::scopeWipe(std::span{first});
-        auto guardB = hepatizon::security::scopeWipe(std::span{second});
+        auto guardA = hepatizon::security::scopeWipe(std::span{ first });
+        auto guardB = hepatizon::security::scopeWipe(std::span{ second });
 
         guardA = std::move(guardB);
 
         expectAllBytesEq(first, std::uint8_t{});
-        expectAllBytesEq(second, nonZeroByte);
+        expectAllBytesEq(second, g_nonZeroByte);
     }
 
     expectAllBytesEq(second, std::uint8_t{});
 }
-

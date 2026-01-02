@@ -2,7 +2,6 @@
 #define INCLUDE_HEPATIZON_SECURITY_SECURERANDOM_HPP
 
 #include <concepts>
-#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <span>

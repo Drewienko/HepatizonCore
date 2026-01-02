@@ -14,6 +14,7 @@ hepc_set_common_warnings(hepatizon_kdf_monocypher)
 
 add_library(hepatizon_crypto_native STATIC
     native/native_anchor.cpp
+    native/NativeCryptoProvider.cpp
 )
 
 target_link_libraries(hepatizon_crypto_native
@@ -22,6 +23,7 @@ target_link_libraries(hepatizon_crypto_native
         hepatizon_security
     PRIVATE
         hepatizon_kdf_monocypher
+        hepatizon_vendor_monocypher
 )
 
 hepc_set_common_warnings(hepatizon_crypto_native)
@@ -29,6 +31,7 @@ hepc_set_common_warnings(hepatizon_crypto_native)
 if(HEPC_ENABLE_OPENSSL)
     add_library(hepatizon_crypto_openssl STATIC
         openssl/openssl_anchor.cpp
+        openssl/OpenSslCryptoProvider.cpp
     )
 
     target_link_libraries(hepatizon_crypto_openssl
@@ -37,8 +40,6 @@ if(HEPC_ENABLE_OPENSSL)
             hepatizon_security
             OpenSSL::SSL
             OpenSSL::Crypto
-        PRIVATE
-            hepatizon_kdf_monocypher
     )
 
     hepc_set_common_warnings(hepatizon_crypto_openssl)
