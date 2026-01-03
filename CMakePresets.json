@@ -23,6 +23,23 @@
       }
     },
     {
+      "name": "linux-debug-gcc-openssl",
+      "displayName": "Linux Debug (GCC + Ninja, OpenSSL)",
+      "description": "Single-config debug build with GCC + OpenSSL provider enabled",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HEPC_ENABLE_TESTS": "ON",
+        "HEPC_ENABLE_OPENSSL": "ON",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
+    },
+    {
       "name": "linux-release-gcc",
       "displayName": "Linux Release (GCC + Ninja)",
       "description": "Single-config release build with GCC",
@@ -85,6 +102,21 @@
       }
     },
     {
+      "name": "windows-debug-msvc-openssl",
+      "displayName": "Windows Debug (MSVC 2022, OpenSSL)",
+      "description": "Multi-config debug build with Visual Studio 2022 + OpenSSL provider enabled",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "HEPC_ENABLE_TESTS": "ON",
+        "HEPC_ENABLE_OPENSSL": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
+    },
+    {
       "name": "windows-release-msvc",
       "displayName": "Windows Release (MSVC 2022)",
       "description": "Multi-config release build with Visual Studio 2022",
@@ -97,12 +129,31 @@
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
+    },
+    {
+      "name": "windows-release-msvc-openssl",
+      "displayName": "Windows Release (MSVC 2022, OpenSSL)",
+      "description": "Multi-config release build with Visual Studio 2022 + OpenSSL provider enabled",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "HEPC_ENABLE_TESTS": "OFF",
+        "HEPC_ENABLE_OPENSSL": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "linux-debug-gcc",
       "configurePreset": "linux-debug-gcc"
+    },
+    {
+      "name": "linux-debug-gcc-openssl",
+      "configurePreset": "linux-debug-gcc-openssl"
     },
     {
       "name": "linux-release-gcc",
@@ -122,8 +173,18 @@
       "configuration": "Debug"
     },
     {
+      "name": "windows-debug-msvc-openssl",
+      "configurePreset": "windows-debug-msvc-openssl",
+      "configuration": "Debug"
+    },
+    {
       "name": "windows-release-msvc",
       "configurePreset": "windows-release-msvc",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-release-msvc-openssl",
+      "configurePreset": "windows-release-msvc-openssl",
       "configuration": "Release"
     }
   ],
@@ -131,6 +192,13 @@
     {
       "name": "linux-debug-gcc",
       "configurePreset": "linux-debug-gcc",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-debug-gcc-openssl",
+      "configurePreset": "linux-debug-gcc-openssl",
       "output": {
         "outputOnFailure": true
       }
@@ -165,8 +233,24 @@
       }
     },
     {
+      "name": "windows-debug-msvc-openssl",
+      "configurePreset": "windows-debug-msvc-openssl",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "windows-release-msvc",
       "configurePreset": "windows-release-msvc",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-release-msvc-openssl",
+      "configurePreset": "windows-release-msvc-openssl",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true

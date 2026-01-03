@@ -12,9 +12,9 @@
 namespace
 {
 
-constexpr std::uint32_t g_fastMemoryKiB{ 8U }; // NOLINT(readability-magic-numbers)
-constexpr std::uint8_t g_testSalt0{ 0x42U };   // NOLINT(readability-magic-numbers)
-constexpr std::uint8_t g_testSalt1{ 0x99U };   // NOLINT(readability-magic-numbers)
+constexpr std::uint32_t g_fastMemoryKiB{ 8U };
+constexpr std::uint8_t g_testSalt0{ 0x42U };
+constexpr std::uint8_t g_testSalt1{ 0x99U };
 
 std::span<const std::byte> asBytes(std::string_view s) noexcept
 {

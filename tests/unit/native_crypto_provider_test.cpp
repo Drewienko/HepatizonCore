@@ -14,8 +14,8 @@
 namespace
 {
 
-constexpr std::uint32_t g_fastMemoryKiB{ 8U }; // NOLINT(readability-magic-numbers)
-constexpr std::uint8_t g_keyByteBase{ 0xA0U }; // NOLINT(readability-magic-numbers)
+constexpr std::uint32_t g_fastMemoryKiB{ 8U };
+constexpr std::uint8_t g_keyByteBase{ 0xA0U };
 
 std::span<const std::byte> asBytes(std::span<const std::uint8_t> s) noexcept
 {

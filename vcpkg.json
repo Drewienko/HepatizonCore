@@ -3,6 +3,11 @@
   "version-string": "0.0.1",
   "dependencies": [
     "openssl",
-    "gtest"
+    "gtest",
+    "sqlite3",
+    {
+      "name": "sqlcipher",
+      "platform": "windows"
+    }
   ]
 }

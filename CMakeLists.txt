@@ -16,6 +16,7 @@ option(HEPC_BUILD_GUI "Build the GUI application (Qt6)" OFF)
 option(HEPC_ENABLE_TESTS "Build tests" OFF)
 option(HEPC_ENABLE_OPENSSL "Enable OpenSSL crypto provider" OFF)
 option(HEPC_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(HEPC_STORAGE_USE_SQLCIPHER "Use SQLCipher for the SQLite storage adapter (Windows-only via vcpkg)" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 

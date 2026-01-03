@@ -12,6 +12,7 @@ if(GTest_FOUND)
         unit/scope_wipe_test.cpp
         unit/key_derivation_test.cpp
         unit/native_crypto_provider_test.cpp
+        unit/sqlite_storage_repository_test.cpp
     )
     target_link_libraries(hepatizoncore_tests PRIVATE
         GTest::gtest
@@ -20,6 +21,7 @@ if(GTest_FOUND)
         hepatizon_security
         hepatizon_kdf_monocypher
         hepatizon_crypto_native
+        hepatizon_storage_sqlite
     )
     hepc_set_common_warnings(hepatizoncore_tests)
     add_test(NAME hepatizoncore_tests COMMAND hepatizoncore_tests)

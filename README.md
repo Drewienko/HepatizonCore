@@ -1,12 +1,11 @@
 # HepatizonCore
 
-HepatizonCore is a modular, security-focused password manager prototype in C++20 with both CLI and Qt-based GUI frontends.
+HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a CLI stub and an optional Qt 6 GUI stub.
 
-> Status (2026-01-02): early-stage WIP — security primitives + Argon2id KDF metadata/policy + crypto providers (Native/OpenSSL, KDF+AEAD) implemented; real CLI/GUI and storage adapters are still in progress.
+> Status (2026-01-03): early-stage WIP. What works: security primitives, Argon2id KDF (metadata + policy), crypto providers (Native + optional OpenSSL), and a minimal storage bootstrap (SQLite vault + `vault.meta`). What’s missing: real CLI/GUI features and the final vault DB schema/migrations.
 
-## ⚠️ Disclaimer - **This is a learning project, not a tool for daily use.**
-
-
+## ⚠️ Disclaimer
+**This is a learning project, not a tool for daily use.**
 
 I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefined Behavior (UB) as much as possible. While I implemented the cryptography carefully, this code has not been audited.
 
@@ -19,6 +18,7 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 - Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`).
 - Crypto port: `ICryptoProvider` (KDF + AEAD), with a Native provider (Monocypher-backed) and an optional OpenSSL provider (`HEPC_ENABLE_OPENSSL`).
 - KDF: Argon2id with versioned, persisted metadata (`KdfMetadata`) + core-owned defaults (`KdfPolicy`). Native/OpenSSL KDF parity test is best-effort (skips if the OpenSSL Argon2id KDF is unavailable at runtime).
+- Storage (WIP): `IStorageRepository` + a minimal SQLite adapter storing a plaintext KDF metadata file (`vault.meta`) and an encrypted header row in `vault.db` (payload encryption is via `ICryptoProvider`).
 
 ---
 
@@ -29,9 +29,10 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 - GUI: Qt 6 (tested on 6.10.1; optional, currently a stub)
 - Crypto: Monocypher (vendored), OpenSSL (optional)
 - Tests: Google Test
+- Data: SQLite3 (via vcpkg; used by the storage adapter)
 
 **Planned**
-- Data: SQLite3 (SQLCipher), nlohmann/json
+- Data: SQLCipher (defense-in-depth), nlohmann/json
 
 ---
 
@@ -103,8 +104,18 @@ HepatizonCore/
 
 ---
 
+## Storage (current direction)
+Vaults are stored as a directory containing two files:
+- `vault.meta` (plaintext): versioned KDF metadata required to derive the master key (`KdfMetadata`). Salt is stored here (salt is not secret).
+- `vault.db` (SQLite for now; SQLCipher later): stores encrypted application payloads as AEAD blobs (`AeadBox`).
+
+The current SQLite adapter persists a single encrypted “vault header” row (`vault_header`, `id = 1`) containing `{nonce, tag, ciphertext}`. The header payload is intended to be a small, versioned binary struct (e.g., header version, vault id, created-at timestamp, and DB schema version) encrypted via `ICryptoProvider`.
+
+---
+
 ## Building
-Prereqs: CMake >= 3.20, a C++20 compiler, and (for GUI) Qt 6.10.1.
+Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1.
+If vcpkg complains about your CMake being too old, just install the version it asks for (on Windows I hit a requirement for 3.31.10).
 
 Note: OpenSSL is optional. Enable the OpenSSL provider with `-DHEPC_ENABLE_OPENSSL=ON` (requires OpenSSL).
 
@@ -142,8 +153,10 @@ Run:
 Presets drive the happy path (see `CMakePresets.json`).
 
 - Linux (GCC debug): `cmake --preset linux-debug-gcc && cmake --build --preset linux-debug-gcc && ctest --preset linux-debug-gcc`
+- Linux (GCC debug + OpenSSL provider): `cmake --preset linux-debug-gcc-openssl && cmake --build --preset linux-debug-gcc-openssl && ctest --preset linux-debug-gcc-openssl`
 - Linux (Clang debug): `cmake --preset linux-debug-clang && cmake --build --preset linux-debug-clang && ctest --preset linux-debug-clang`
 - Windows (MSVC debug): `cmake --preset windows-debug-msvc && cmake --build --preset windows-debug-msvc --config Debug && ctest --preset windows-debug-msvc -C Debug`
+- Windows (MSVC debug + OpenSSL provider): `cmake --preset windows-debug-msvc-openssl && cmake --build --preset windows-debug-msvc-openssl --config Debug && ctest --preset windows-debug-msvc-openssl -C Debug`
 
 Options:
 - OpenSSL provider + OpenSSL-gated tests: configure with `-DHEPC_ENABLE_OPENSSL=ON` (parity test is best-effort and may skip if the Argon2id KDF is not exposed by the current OpenSSL providers/build).

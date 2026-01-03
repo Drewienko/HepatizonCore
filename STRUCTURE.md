@@ -83,3 +83,6 @@ Implications:
 - `ICryptoProvider` must be able to derive the master key from the persisted metadata.
 - Since multiple providers exist (Native/OpenSSL), they must agree on the same metadata structure.
 - KDF policy changes require versioning/migration logic (explicit, not ad-hoc).
+
+Bootstrap note:
+- When using SQLCipher, `KdfMetadata` must be readable *before* the encrypted DB can be opened. A common approach is a small plaintext sidecar metadata file (e.g., `vault.meta`) next to the database file.
