@@ -47,7 +47,7 @@ Contains:
 ### HepatizonOpenSSL (Optional)
 **Role:** Production crypto provider implementation.  
 **Depends on:** HepatizonInterfaces + HepatizonSecurity + OpenSSL.  
-**KDF:** Uses HepatizonKdfMonocypher (shared backend) to keep one KDF implementation.
+**KDF:** Uses OpenSSL's Argon2id KDF; must match the persisted `KdfMetadata` contract.
 
 ### HepatizonStorageSqlite (Optional)
 **Role:** SQLite/SQLCipher storage adapter implementation.  
@@ -68,10 +68,9 @@ HepatizonCli / HepatizonGui
         +----> (ports) ICryptoProvider / IStorageRepository / IClock ...
                     ^                    ^
                     |                    |
-     HepatizonNative / HepatizonOpenSSL  HepatizonStorageSqlite
-                    |
-                    v
-          HepatizonKdfMonocypher (shared KDF backend)
+     HepatizonNative -------------------> HepatizonKdfMonocypher (shared KDF backend)
+     HepatizonOpenSSL ------------------> OpenSSL (Argon2id KDF)
+     HepatizonStorageSqlite ------------> SQLite/SQLCipher
 
 HepatizonSecurity is usable by Core and all adapters.
 ```
@@ -84,5 +83,3 @@ Implications:
 - `ICryptoProvider` must be able to derive the master key from the persisted metadata.
 - Since multiple providers exist (Native/OpenSSL), they must agree on the same metadata structure.
 - KDF policy changes require versioning/migration logic (explicit, not ad-hoc).
-
-

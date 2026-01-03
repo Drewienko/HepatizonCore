@@ -16,6 +16,7 @@ if(GTest_FOUND)
     target_link_libraries(hepatizoncore_tests PRIVATE
         GTest::gtest
         GTest::gtest_main
+        hepatizon_adapters_headers
         hepatizon_security
         hepatizon_kdf_monocypher
         hepatizon_crypto_native

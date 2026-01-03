@@ -14,3 +14,4 @@ deriveMasterKeyArgon2id(std::span<const std::byte> password, std::span<const std
 } // namespace hepatizon::crypto
 
 #endif // INCLUDE_HEPATIZON_CRYPTO_KEYDERIVATION_HPP
+
