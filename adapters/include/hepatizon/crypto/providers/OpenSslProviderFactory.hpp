@@ -12,4 +12,3 @@ namespace hepatizon::crypto::providers
 } // namespace hepatizon::crypto::providers
 
 #endif // INCLUDE_HEPATIZON_CRYPTO_PROVIDERS_OPENSSLPROVIDERFACTORY_HPP
-

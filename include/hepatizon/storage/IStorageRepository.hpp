@@ -3,9 +3,9 @@
 
 #include "hepatizon/crypto/ICryptoProvider.hpp"
 #include "hepatizon/crypto/KdfMetadata.hpp"
-#include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <string_view>
 
 namespace hepatizon::storage
 {
@@ -32,6 +32,12 @@ public:
 
     virtual void storeEncryptedHeader(const std::filesystem::path& vaultDir,
                                       const hepatizon::crypto::AeadBox& encryptedHeader) = 0;
+
+    virtual void storeBlob(const std::filesystem::path& vaultDir, std::string_view key,
+                           const hepatizon::crypto::AeadBox& value) = 0;
+
+    [[nodiscard]] virtual std::optional<hepatizon::crypto::AeadBox> loadBlob(const std::filesystem::path& vaultDir,
+                                                                             std::string_view key) const = 0;
 };
 
 } // namespace hepatizon::storage

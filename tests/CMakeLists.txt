@@ -13,12 +13,17 @@ if(GTest_FOUND)
         unit/key_derivation_test.cpp
         unit/native_crypto_provider_test.cpp
         unit/sqlite_storage_repository_test.cpp
+        unit/vault_service_native_integration_test.cpp
+    )
+    target_include_directories(hepatizoncore_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
     )
     target_link_libraries(hepatizoncore_tests PRIVATE
         GTest::gtest
         GTest::gtest_main
         hepatizon_adapters_headers
         hepatizon_security
+        hepatizon_core
         hepatizon_kdf_monocypher
         hepatizon_crypto_native
         hepatizon_storage_sqlite
@@ -29,6 +34,7 @@ if(GTest_FOUND)
     if(HEPC_ENABLE_OPENSSL)
         target_sources(hepatizoncore_tests PRIVATE
             unit/openssl_kdf_parity_test.cpp
+            unit/vault_service_openssl_integration_test.cpp
         )
         target_link_libraries(hepatizoncore_tests PRIVATE
             hepatizon_crypto_openssl

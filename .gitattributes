@@ -1,5 +1,5 @@
 # GitHub Linguist (and tools relying on it): treat third-party sources as vendored.
-third_party/** linguist-vendored
+third_party/** linguist-vendored 
 
 # vcpkg is a submodule, but keep it excluded if it ever becomes vendored.
 vcpkg/** linguist-vendored

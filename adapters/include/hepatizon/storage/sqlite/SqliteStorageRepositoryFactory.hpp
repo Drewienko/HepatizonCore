@@ -12,4 +12,3 @@ namespace hepatizon::storage::sqlite
 } // namespace hepatizon::storage::sqlite
 
 #endif // INCLUDE_HEPATIZON_STORAGE_SQLITE_SQLITESTORAGEREPOSITORYFACTORY_HPP
-

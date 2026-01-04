@@ -9,6 +9,9 @@ namespace hepatizon::core
 
 [[nodiscard]] hepatizon::crypto::Argon2idParams defaultArgon2idParams() noexcept;
 
+[[nodiscard]] std::optional<hepatizon::crypto::KdfMetadata>
+makeKdfMetadata(hepatizon::crypto::Argon2idParams params) noexcept;
+
 [[nodiscard]] std::optional<hepatizon::crypto::KdfMetadata> makeDefaultKdfMetadata() noexcept;
 
 } // namespace hepatizon::core

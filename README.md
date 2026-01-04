@@ -1,8 +1,8 @@
 # HepatizonCore
 
-HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a CLI stub and an optional Qt 6 GUI stub.
+HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a temporary debug CLI harness and an optional Qt 6 GUI stub.
 
-> Status (2026-01-03): early-stage WIP. What works: security primitives, Argon2id KDF (metadata + policy), crypto providers (Native + optional OpenSSL), and a minimal storage bootstrap (SQLite vault + `vault.meta`). What’s missing: real CLI/GUI features and the final vault DB schema/migrations.
+> Status (2026-01-04): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/unlock + encrypted secret blobs. What’s missing: the final vault DB schema + full DB migrations (only header schema versioning + a tiny header migration exists), and CLI/GUI features.
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
@@ -29,10 +29,10 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 - GUI: Qt 6 (tested on 6.10.1; optional, currently a stub)
 - Crypto: Monocypher (vendored), OpenSSL (optional)
 - Tests: Google Test
-- Data: SQLite3 (via vcpkg; used by the storage adapter)
+- Data: SQLite3 (via vcpkg; used by the storage adapter). On Windows the adapter can be built against SQLCipher with `-DHEPC_STORAGE_USE_SQLCIPHER=ON` (encryption-at-rest is still WIP).
 
 **Planned**
-- Data: SQLCipher (defense-in-depth), nlohmann/json
+- Data: nlohmann/json
 
 ---
 
@@ -107,7 +107,7 @@ HepatizonCore/
 ## Storage (current direction)
 Vaults are stored as a directory containing two files:
 - `vault.meta` (plaintext): versioned KDF metadata required to derive the master key (`KdfMetadata`). Salt is stored here (salt is not secret).
-- `vault.db` (SQLite for now; SQLCipher later): stores encrypted application payloads as AEAD blobs (`AeadBox`).
+- `vault.db` (SQLite): stores encrypted application payloads as AEAD blobs (`AeadBox`). On Windows the adapter can be built against SQLCipher (`HEPC_STORAGE_USE_SQLCIPHER`), but the “encrypted database at rest” story is not finished yet.
 
 The current SQLite adapter persists a single encrypted “vault header” row (`vault_header`, `id = 1`) containing `{nonce, tag, ciphertext}`. The header payload is intended to be a small, versioned binary struct (e.g., header version, vault id, created-at timestamp, and DB schema version) encrypted via `ICryptoProvider`.
 
@@ -144,23 +144,25 @@ Build:
 - Windows MSVC: `cmake --build --preset windows-release-msvc --config Release`
 
 Run:
-- CLI (stub): `out/build/<preset>/src/ui/hepatizoncore_cli`
+- CLI: temporary debug harness (stdout-based); real CLI planned (CLI11)
 - GUI (stub): `out/build/<preset>/src/ui/hepatizoncore_gui`
 
 ---
 
 ## Tests
 Presets drive the happy path (see `CMakePresets.json`).
+Note: CTest registers a single test executable (`hepatizoncore_tests`) which internally runs many GoogleTest test cases. Use `ctest -V` (or `--gtest_filter=...`) when you need per-test output.
 
 - Linux (GCC debug): `cmake --preset linux-debug-gcc && cmake --build --preset linux-debug-gcc && ctest --preset linux-debug-gcc`
 - Linux (GCC debug + OpenSSL provider): `cmake --preset linux-debug-gcc-openssl && cmake --build --preset linux-debug-gcc-openssl && ctest --preset linux-debug-gcc-openssl`
 - Linux (Clang debug): `cmake --preset linux-debug-clang && cmake --build --preset linux-debug-clang && ctest --preset linux-debug-clang`
+- Linux (Clang debug + sanitizers): `ctest --preset linux-debug-clang-sanitize` (slower; enables ASAN/UBSAN)
 - Windows (MSVC debug): `cmake --preset windows-debug-msvc && cmake --build --preset windows-debug-msvc --config Debug && ctest --preset windows-debug-msvc -C Debug`
 - Windows (MSVC debug + OpenSSL provider): `cmake --preset windows-debug-msvc-openssl && cmake --build --preset windows-debug-msvc-openssl --config Debug && ctest --preset windows-debug-msvc-openssl -C Debug`
 
 Options:
 - OpenSSL provider + OpenSSL-gated tests: configure with `-DHEPC_ENABLE_OPENSSL=ON` (parity test is best-effort and may skip if the Argon2id KDF is not exposed by the current OpenSSL providers/build).
-- Slow KDF tests: set `HEPC_RUN_SLOW_TESTS=1` before running `ctest`.
+- Slow KDF tests: set `HEPC_RUN_SLOW_TESTS=1` before running `ctest`. This also switches VaultService integration tests to use the default (production-like) KDF parameters instead of the fast test preset.
 
 ---
 

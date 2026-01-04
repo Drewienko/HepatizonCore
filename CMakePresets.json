@@ -72,6 +72,24 @@
       }
     },
     {
+      "name": "linux-debug-clang-sanitize",
+      "displayName": "Linux Debug (Clang + ASan/UBSan)",
+      "description": "Single-config debug build with Clang + AddressSanitizer + UndefinedBehaviorSanitizer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HEPC_ENABLE_TESTS": "ON",
+        "HEPC_ENABLE_SANITIZERS": "ON",
+        "HEPC_ENABLE_WARNINGS_AS_ERRORS": "ON",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
+    },
+    {
       "name": "linux-release-clang",
       "displayName": "Linux Release (Clang + Ninja)",
       "description": "Single-config release build with Clang",
@@ -164,6 +182,10 @@
       "configurePreset": "linux-debug-clang"
     },
     {
+      "name": "linux-debug-clang-sanitize",
+      "configurePreset": "linux-debug-clang-sanitize"
+    },
+    {
       "name": "linux-release-clang",
       "configurePreset": "linux-release-clang"
     },
@@ -213,6 +235,17 @@
     {
       "name": "linux-debug-clang",
       "configurePreset": "linux-debug-clang",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-debug-clang-sanitize",
+      "configurePreset": "linux-debug-clang-sanitize",
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1"
+      },
       "output": {
         "outputOnFailure": true
       }

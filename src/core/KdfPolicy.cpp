@@ -19,10 +19,11 @@ namespace hepatizon::core
     };
 }
 
-[[nodiscard]] std::optional<hepatizon::crypto::KdfMetadata> makeDefaultKdfMetadata() noexcept
+[[nodiscard]] std::optional<hepatizon::crypto::KdfMetadata>
+makeKdfMetadata(hepatizon::crypto::Argon2idParams params) noexcept
 {
     hepatizon::crypto::KdfMetadata meta{};
-    meta.argon2id = defaultArgon2idParams();
+    meta.argon2id = params;
 
     if (!hepatizon::security::secureRandomFill(std::span<std::uint8_t>{ meta.salt }))
     {
@@ -30,6 +31,11 @@ namespace hepatizon::core
     }
 
     return meta;
+}
+
+[[nodiscard]] std::optional<hepatizon::crypto::KdfMetadata> makeDefaultKdfMetadata() noexcept
+{
+    return makeKdfMetadata(defaultArgon2idParams());
 }
 
 } // namespace hepatizon::core

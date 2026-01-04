@@ -1,27 +1,15 @@
 #include "hepatizon/storage/sqlite/SqliteStorageRepositoryFactory.hpp"
 
 #include "hepatizon/crypto/KdfMetadata.hpp"
+#include "test_utils/TestUtils.hpp"
+#include <array>
 #include <filesystem>
 #include <gtest/gtest.h>
-#include <string>
-
-namespace
-{
-
-[[nodiscard]] std::filesystem::path makeTempDir()
-{
-    const auto base = std::filesystem::temp_directory_path();
-    const auto dir = base / std::filesystem::path{ "hepatizoncore_sqlite_storage_test" } /
-                     std::filesystem::path{ std::to_string(::testing::UnitTest::GetInstance()->random_seed()) };
-    return dir;
-}
-
-} // namespace
 
 TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
 {
-    const auto dir = makeTempDir();
-    std::filesystem::remove_all(dir);
+    const auto dir = hepatizon::test_utils::makeSecureTempDir("sqlite_storage_");
+    ASSERT_FALSE(dir.empty());
 
     auto repo = hepatizon::storage::sqlite::makeSqliteStorageRepository();
 

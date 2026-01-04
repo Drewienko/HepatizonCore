@@ -2,7 +2,16 @@ if(HEPC_BUILD_CLI)
     add_executable(hepatizoncore_cli
         cli/main.cpp
     )
-    target_link_libraries(hepatizoncore_cli PRIVATE hepatizon_core)
+    target_link_libraries(hepatizoncore_cli PRIVATE
+        hepatizon_core
+        hepatizon_adapters_headers
+        hepatizon_crypto_native
+        hepatizon_storage_sqlite
+    )
+    if(HEPC_ENABLE_OPENSSL)
+        target_link_libraries(hepatizoncore_cli PRIVATE hepatizon_crypto_openssl)
+        target_compile_definitions(hepatizoncore_cli PRIVATE HEPC_ENABLE_OPENSSL=1)
+    endif()
     hepc_set_common_warnings(hepatizoncore_cli)
 endif()
 

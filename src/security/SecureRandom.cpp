@@ -27,6 +27,7 @@ bool secureRandomFill(std::span<std::uint8_t> out) noexcept
     std::uint8_t* outPtr{ out.data() };
     std::size_t remaining{ out.size() };
 #if defined(_WIN32)
+
     constexpr std::size_t kMaxChunk{ static_cast<std::size_t>(std::numeric_limits<ULONG>::max()) };
     while (remaining > 0U)
     {
@@ -39,13 +40,10 @@ bool secureRandomFill(std::span<std::uint8_t> out) noexcept
             return false;
         }
 
-        if (chunk > remaining)
-        {
-            return false;
-        }
         remaining -= chunk;
         outPtr += chunk;
     }
+
 #elif defined(__linux__)
     while (remaining > 0)
     {

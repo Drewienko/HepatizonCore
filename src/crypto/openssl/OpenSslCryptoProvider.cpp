@@ -202,31 +202,28 @@ public:
 
         int len = 0;
         const auto ad = asU8(associatedData);
-        if (!ad.empty())
+        const auto* adPtr = ad.empty() ? nullptr : ad.data();
+        if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
         {
-            if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, ad.data(), static_cast<int>(ad.size())) != 1)
-            {
-                throw std::runtime_error("aeadEncrypt: add aad failed");
-            }
+            throw std::runtime_error("aeadEncrypt: add aad failed");
         }
 
         box.cipherText.resize(plainText.size());
         const auto pt = asU8(plainText);
         int outLen = 0;
-        if (!pt.empty())
+        const auto* ptPtr = pt.empty() ? nullptr : pt.data();
+        auto* ctPtr = box.cipherText.empty() ? nullptr : box.cipherText.data();
+        if (EVP_EncryptUpdate(ctx.get(), ctPtr, &outLen, ptPtr, static_cast<int>(pt.size())) != 1)
         {
-            if (EVP_EncryptUpdate(ctx.get(), box.cipherText.data(), &outLen, pt.data(), static_cast<int>(pt.size())) !=
-                1)
-            {
-                throw std::runtime_error("aeadEncrypt: encrypt update failed");
-            }
+            throw std::runtime_error("aeadEncrypt: encrypt update failed");
         }
         if (outLen < 0 || static_cast<std::size_t>(outLen) > box.cipherText.size())
         {
             throw std::runtime_error("aeadEncrypt: invalid output length");
         }
         int finalLen = 0;
-        if (EVP_EncryptFinal_ex(ctx.get(), box.cipherText.data() + outLen, &finalLen) != 1)
+        auto* ctFinalPtr = box.cipherText.empty() ? nullptr : (box.cipherText.data() + outLen);
+        if (EVP_EncryptFinal_ex(ctx.get(), ctFinalPtr, &finalLen) != 1)
         {
             throw std::runtime_error("aeadEncrypt: encrypt final failed");
         }
@@ -285,26 +282,22 @@ public:
 
         int len = 0;
         const auto ad = asU8(associatedData);
-        if (!ad.empty())
+        const auto* adPtr = ad.empty() ? nullptr : ad.data();
+        if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
         {
-            if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, ad.data(), static_cast<int>(ad.size())) != 1)
-            {
-                throw std::runtime_error("aeadDecrypt: add aad failed");
-            }
+            throw std::runtime_error("aeadDecrypt: add aad failed");
         }
 
         hepatizon::security::SecureBuffer plainText{};
         plainText.resize(box.cipherText.size());
 
         int outLen = 0;
-        if (!box.cipherText.empty())
+        const auto* ctPtr = box.cipherText.empty() ? nullptr : box.cipherText.data();
+        auto* ptPtr = plainText.empty() ? nullptr : plainText.data();
+        if (EVP_DecryptUpdate(ctx.get(), ptPtr, &outLen, ctPtr, static_cast<int>(box.cipherText.size())) != 1)
         {
-            if (EVP_DecryptUpdate(ctx.get(), plainText.data(), &outLen, box.cipherText.data(),
-                                  static_cast<int>(box.cipherText.size())) != 1)
-            {
-                hepatizon::security::secureRelease(plainText);
-                return std::nullopt;
-            }
+            hepatizon::security::secureRelease(plainText);
+            return std::nullopt;
         }
         if (outLen < 0 || static_cast<std::size_t>(outLen) > plainText.size())
         {
@@ -319,7 +312,8 @@ public:
         }
 
         int finalLen = 0;
-        if (EVP_DecryptFinal_ex(ctx.get(), plainText.data() + outLen, &finalLen) != 1)
+        auto* ptFinalPtr = plainText.empty() ? nullptr : (plainText.data() + outLen);
+        if (EVP_DecryptFinal_ex(ctx.get(), ptFinalPtr, &finalLen) != 1)
         {
             hepatizon::security::secureRelease(plainText);
             return std::nullopt;

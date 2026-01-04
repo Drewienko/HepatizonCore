@@ -1,6 +1,9 @@
 add_library(hepatizon_core STATIC
     core_anchor.cpp
     KdfPolicy.cpp
+    VaultHeader.cpp
+    VaultHeaderAad.cpp
+    VaultService.cpp
 )
 
 target_link_libraries(hepatizon_core
