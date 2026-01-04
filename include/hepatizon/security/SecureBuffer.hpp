@@ -40,7 +40,7 @@ inline void secureResize(SecureBuffer& b, std::size_t newSize)
 {
     if (newSize < b.size())
     {
-        auto full = asSpan(b);
+        auto full{ asSpan(b) };
         secureWipe(std::as_writable_bytes(full.subspan(newSize)));
     }
     b.resize(newSize);
@@ -55,7 +55,7 @@ inline void secureClear(SecureBuffer& b) noexcept
 inline void secureRelease(SecureBuffer& b) noexcept
 {
     secureWipeSize(b);
-    SecureBuffer temp;
+    SecureBuffer temp{};
     b.swap(temp);
 }
 

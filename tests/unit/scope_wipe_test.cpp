@@ -28,7 +28,7 @@ TEST(ScopeWipe, WipesOnDestruction)
     buffer.fill(g_nonZeroByte);
 
     {
-        const auto guard = hepatizon::security::scopeWipe(std::span{ buffer });
+        const auto guard{ hepatizon::security::scopeWipe(std::span{ buffer }) };
         (void)guard;
         expectAllBytesEq(buffer, g_nonZeroByte);
     }
@@ -42,7 +42,7 @@ TEST(ScopeWipe, ReleaseDisablesWipe)
     buffer.fill(g_nonZeroByte);
 
     {
-        auto guard = hepatizon::security::scopeWipe(std::span{ buffer });
+        auto guard{ hepatizon::security::scopeWipe(std::span{ buffer }) };
         guard.release();
     }
 
@@ -55,8 +55,8 @@ TEST(ScopeWipe, MoveTransfersWipeResponsibility)
     buffer.fill(g_nonZeroByte);
 
     {
-        auto a = hepatizon::security::scopeWipe(std::span{ buffer });
-        auto b = std::move(a);
+        auto a{ hepatizon::security::scopeWipe(std::span{ buffer }) };
+        auto b{ std::move(a) };
         (void)b;
     }
 
@@ -71,8 +71,8 @@ TEST(ScopeWipe, MoveAssignmentWipesOldThenTakesOver)
     second.fill(g_nonZeroByte);
 
     {
-        auto guardA = hepatizon::security::scopeWipe(std::span{ first });
-        auto guardB = hepatizon::security::scopeWipe(std::span{ second });
+        auto guardA{ hepatizon::security::scopeWipe(std::span{ first }) };
+        auto guardB{ hepatizon::security::scopeWipe(std::span{ second }) };
 
         guardA = std::move(guardB);
 

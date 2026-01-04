@@ -25,8 +25,8 @@ std::span<const std::byte> asBytes(std::string_view s) noexcept
 
 TEST(CryptoProviderParity, DeriveMasterKeyNativeEqualsOpenSsl)
 {
-    auto native = hepatizon::crypto::providers::makeNativeCryptoProvider();
-    auto openssl = hepatizon::crypto::providers::makeOpenSslCryptoProvider();
+    auto native{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
+    auto openssl{ hepatizon::crypto::providers::makeOpenSslCryptoProvider() };
 
     hepatizon::crypto::KdfMetadata meta{};
     meta.argon2id =
@@ -36,7 +36,7 @@ TEST(CryptoProviderParity, DeriveMasterKeyNativeEqualsOpenSsl)
 
     constexpr std::string_view kPassword{ "strongPassword" };
 
-    const auto nativeKey = native->deriveMasterKey(asBytes(kPassword), meta);
+    const auto nativeKey{ native->deriveMasterKey(asBytes(kPassword), meta) };
 
     hepatizon::security::SecureBuffer opensslKey{};
     try

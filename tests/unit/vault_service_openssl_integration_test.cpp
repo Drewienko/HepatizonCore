@@ -17,25 +17,26 @@ void maybeSkip(const hepatizon::test_utils::ScenarioResult& res)
 
 TEST(VaultService, CreateUnlockAndSecretsWithOpenSslProvider)
 {
-    auto crypto = hepatizon::crypto::providers::makeOpenSslCryptoProvider();
-    const auto res =
-        hepatizon::test_utils::runVaultServiceCreateUnlockAndSecrets(*crypto, "vault_service_openssl_", true);
+    auto crypto{ hepatizon::crypto::providers::makeOpenSslCryptoProvider() };
+    const auto res{ hepatizon::test_utils::runVaultServiceCreateUnlockAndSecrets(*crypto, "vault_service_openssl_",
+                                                                                 true) };
     maybeSkip(res);
     ASSERT_EQ(res.outcome, hepatizon::test_utils::ScenarioOutcome::Ok);
 }
 
 TEST(VaultService, RejectsFutureSchemaWithOpenSslProvider)
 {
-    auto crypto = hepatizon::crypto::providers::makeOpenSslCryptoProvider();
-    const auto res = hepatizon::test_utils::runVaultServiceRejectsFutureSchema(*crypto, "vault_service_openssl_", true);
+    auto crypto{ hepatizon::crypto::providers::makeOpenSslCryptoProvider() };
+    const auto res{ hepatizon::test_utils::runVaultServiceRejectsFutureSchema(*crypto, "vault_service_openssl_",
+                                                                              true) };
     maybeSkip(res);
     ASSERT_EQ(res.outcome, hepatizon::test_utils::ScenarioOutcome::Ok);
 }
 
 TEST(VaultService, MigratesOldSchemaWithOpenSslProvider)
 {
-    auto crypto = hepatizon::crypto::providers::makeOpenSslCryptoProvider();
-    const auto res = hepatizon::test_utils::runVaultServiceMigratesOldSchema(*crypto, "vault_service_openssl_", true);
+    auto crypto{ hepatizon::crypto::providers::makeOpenSslCryptoProvider() };
+    const auto res{ hepatizon::test_utils::runVaultServiceMigratesOldSchema(*crypto, "vault_service_openssl_", true) };
     maybeSkip(res);
     ASSERT_EQ(res.outcome, hepatizon::test_utils::ScenarioOutcome::Ok);
 }

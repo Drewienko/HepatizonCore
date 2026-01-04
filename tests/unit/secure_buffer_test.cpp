@@ -41,7 +41,7 @@ TEST(SecureBuffer, SecureWipeSizeZerosContentsAndPreservesSize)
         b = nonZeroByte;
     }
 
-    const std::size_t oldSize = buffer.size();
+    const std::size_t oldSize{ buffer.size() };
     hepatizon::security::secureWipeSize(buffer);
 
     EXPECT_EQ(buffer.size(), oldSize);
@@ -86,7 +86,7 @@ TEST(SecureBuffer, SecureClearEmptiesAndKeepsCapacity)
     buffer.reserve(reservedCapacity);
     buffer.resize(bufferSize);
 
-    const std::size_t oldCapacity = buffer.capacity();
+    const std::size_t oldCapacity{ buffer.capacity() };
     hepatizon::security::secureClear(buffer);
 
     EXPECT_TRUE(buffer.empty());

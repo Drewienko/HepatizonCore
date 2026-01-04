@@ -8,6 +8,7 @@
 
 #include "hepatizon/crypto/KeyDerivation.hpp"
 #include "hepatizon/security/SecureEquals.hpp"
+#include "test_utils/TestUtils.hpp"
 
 namespace
 {
@@ -104,10 +105,10 @@ TEST(KeyDerivation, Produces32ByteKeyAndIsDeterministic)
     salt[1] = std::byte{ 0x02 };
     salt[2] = std::byte{ 0x03 };
 
-    const auto a =
-        hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, g_kFastTestParams);
-    const auto b =
-        hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, g_kFastTestParams);
+    const auto a{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt },
+                                                             g_kFastTestParams) };
+    const auto b{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt },
+                                                             g_kFastTestParams) };
 
     ASSERT_EQ(a.size(), hepatizon::crypto::g_kMasterKeyBytes);
     ASSERT_EQ(b.size(), hepatizon::crypto::g_kMasterKeyBytes);
@@ -122,8 +123,8 @@ TEST(KeyDerivation, DifferentParallelismProducesDifferentKey)
     constexpr hepatizon::crypto::Argon2idParams kP1{ .iterations = 1U, .memoryKiB = 16U, .parallelism = 1U };
     constexpr hepatizon::crypto::Argon2idParams kP2{ .iterations = 1U, .memoryKiB = 16U, .parallelism = 2U };
 
-    const auto a = hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, kP1);
-    const auto b = hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, kP2);
+    const auto a{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, kP1) };
+    const auto b{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, kP2) };
 
     ASSERT_EQ(a.size(), hepatizon::crypto::g_kMasterKeyBytes);
     ASSERT_EQ(b.size(), hepatizon::crypto::g_kMasterKeyBytes);
@@ -137,10 +138,10 @@ TEST(KeyDerivation, DifferentSaltProducesDifferentKey)
     saltA[0] = std::byte{ 0x01 };
     saltB[0] = std::byte{ 0x02 };
 
-    const auto a =
-        hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ saltA }, g_kFastTestParams);
-    const auto b =
-        hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ saltB }, g_kFastTestParams);
+    const auto a{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ saltA },
+                                                             g_kFastTestParams) };
+    const auto b{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ saltB },
+                                                             g_kFastTestParams) };
 
     ASSERT_EQ(a.size(), hepatizon::crypto::g_kMasterKeyBytes);
     ASSERT_EQ(b.size(), hepatizon::crypto::g_kMasterKeyBytes);
@@ -149,7 +150,7 @@ TEST(KeyDerivation, DifferentSaltProducesDifferentKey)
 
 TEST(KeyDerivation, LargerParamsDerives32ByteKey)
 {
-    if (std::getenv("HEPC_RUN_SLOW_TESTS") == nullptr)
+    if (!hepatizon::test_utils::envFlagSet("HEPC_RUN_SLOW_TESTS"))
     {
         GTEST_SKIP() << "Set HEPC_RUN_SLOW_TESTS=1 to run slow KDF tests.";
     }
@@ -159,7 +160,7 @@ TEST(KeyDerivation, LargerParamsDerives32ByteKey)
     salt[1] = g_slowSalt1;
     salt[2] = g_slowSalt2;
 
-    const auto key =
-        hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt }, g_kLargerTestParams);
+    const auto key{ hepatizon::crypto::deriveMasterKeyArgon2id(asBytes(g_kStrongPassword), std::span{ salt },
+                                                               g_kLargerTestParams) };
     ASSERT_EQ(key.size(), hepatizon::crypto::g_kMasterKeyBytes);
 }

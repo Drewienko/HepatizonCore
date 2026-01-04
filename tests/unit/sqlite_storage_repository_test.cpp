@@ -8,10 +8,10 @@
 
 TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
 {
-    const auto dir = hepatizon::test_utils::makeSecureTempDir("sqlite_storage_");
+    const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_") };
     ASSERT_FALSE(dir.empty());
 
-    auto repo = hepatizon::storage::sqlite::makeSqliteStorageRepository();
+    auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
 
     constexpr std::uint32_t kIterations{ 3U };
     constexpr std::uint32_t kMemoryMiB{ 64U };
@@ -30,17 +30,17 @@ TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
     kdf.argon2Version = hepatizon::crypto::g_kArgon2VersionV13;
     kdf.derivedKeyBytes = static_cast<std::uint32_t>(hepatizon::crypto::g_kMasterKeyBytes);
     kdf.argon2id = hepatizon::crypto::Argon2idParams{ kIterations, kMemoryMiB * kKiBPerMiB, kParallelism };
-    for (std::size_t i = 0; i < kdf.salt.size(); ++i)
+    for (std::size_t i{ 0 }; i < kdf.salt.size(); ++i)
     {
         kdf.salt[i] = static_cast<std::uint8_t>(i);
     }
 
     hepatizon::crypto::AeadBox header{};
-    for (std::size_t i = 0; i < header.nonce.size(); ++i)
+    for (std::size_t i{ 0 }; i < header.nonce.size(); ++i)
     {
         header.nonce[i] = static_cast<std::uint8_t>(kNonceBase + i);
     }
-    for (std::size_t i = 0; i < header.tag.size(); ++i)
+    for (std::size_t i{ 0 }; i < header.tag.size(); ++i)
     {
         header.tag[i] = static_cast<std::uint8_t>(kTagBase + i);
     }
@@ -51,7 +51,7 @@ TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
     info.encryptedHeader = header;
 
     repo->createVault(dir, info);
-    const auto loaded = repo->loadVaultInfo(dir);
+    const auto loaded{ repo->loadVaultInfo(dir) };
 
     EXPECT_EQ(loaded.kdf.policyVersion, kdf.policyVersion);
     EXPECT_EQ(static_cast<std::uint32_t>(loaded.kdf.algorithm), static_cast<std::uint32_t>(kdf.algorithm));

@@ -68,7 +68,7 @@ inline void secureResize(SecureString& s, std::size_t newSize)
 {
     if (newSize < s.size())
     {
-        auto fullSpan = asWritableBytes(s);
+        auto fullSpan{ asWritableBytes(s) };
         secureWipe(fullSpan.subspan(newSize));
     }
     s.resize(newSize);

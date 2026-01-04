@@ -91,7 +91,7 @@ using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX
 
 EvpKdfPtr fetchArgon2idKdf()
 {
-    if (EVP_KDF* kdf = EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr); kdf != nullptr)
+    if (EVP_KDF * kdf{ EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr) }; kdf != nullptr)
     {
         return EvpKdfPtr{ kdf, &EVP_KDF_free };
     }
@@ -126,15 +126,15 @@ public:
             throw std::runtime_error("deriveMasterKey: EVP_KDF_CTX_new failed");
         }
 
-        std::uint32_t iter = meta.argon2id.iterations;
-        std::uint32_t memcostKiB = meta.argon2id.memoryKiB;
-        std::uint32_t lanes = meta.argon2id.parallelism;
-        std::uint32_t threads = meta.argon2id.parallelism;
-        std::uint32_t version = meta.argon2Version;
+        std::uint32_t iter{ meta.argon2id.iterations };
+        std::uint32_t memcostKiB{ meta.argon2id.memoryKiB };
+        std::uint32_t lanes{ meta.argon2id.parallelism };
+        std::uint32_t threads{ meta.argon2id.parallelism };
+        std::uint32_t version{ meta.argon2Version };
 
         // OSSL_PARAM wants non-const pointers for octet strings.
-        auto* passPtr = const_cast<std::uint8_t*>(asU8(password).data());
-        auto* saltPtr = const_cast<std::uint8_t*>(meta.salt.data());
+        auto* passPtr{ const_cast<std::uint8_t*>(asU8(password).data()) };
+        auto* saltPtr{ const_cast<std::uint8_t*>(meta.salt.data()) };
 
         OSSL_PARAM params[]{
             OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, passPtr, password.size()),
@@ -200,19 +200,19 @@ public:
             throw std::runtime_error("aeadEncrypt: set key/nonce failed");
         }
 
-        int len = 0;
-        const auto ad = asU8(associatedData);
-        const auto* adPtr = ad.empty() ? nullptr : ad.data();
+        int len{ 0 };
+        const auto ad{ asU8(associatedData) };
+        const auto* adPtr{ ad.data() };
         if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
         {
             throw std::runtime_error("aeadEncrypt: add aad failed");
         }
 
         box.cipherText.resize(plainText.size());
-        const auto pt = asU8(plainText);
-        int outLen = 0;
-        const auto* ptPtr = pt.empty() ? nullptr : pt.data();
-        auto* ctPtr = box.cipherText.empty() ? nullptr : box.cipherText.data();
+        const auto pt{ asU8(plainText) };
+        int outLen{ 0 };
+        const auto* ptPtr{ pt.data() };
+        auto* ctPtr{ box.cipherText.empty() ? nullptr : box.cipherText.data() };
         if (EVP_EncryptUpdate(ctx.get(), ctPtr, &outLen, ptPtr, static_cast<int>(pt.size())) != 1)
         {
             throw std::runtime_error("aeadEncrypt: encrypt update failed");
@@ -221,8 +221,8 @@ public:
         {
             throw std::runtime_error("aeadEncrypt: invalid output length");
         }
-        int finalLen = 0;
-        auto* ctFinalPtr = box.cipherText.empty() ? nullptr : (box.cipherText.data() + outLen);
+        int finalLen{ 0 };
+        auto* ctFinalPtr{ box.cipherText.empty() ? nullptr : (box.cipherText.data() + outLen) };
         if (EVP_EncryptFinal_ex(ctx.get(), ctFinalPtr, &finalLen) != 1)
         {
             throw std::runtime_error("aeadEncrypt: encrypt final failed");
@@ -280,9 +280,9 @@ public:
             throw std::runtime_error("aeadDecrypt: set key/nonce failed");
         }
 
-        int len = 0;
-        const auto ad = asU8(associatedData);
-        const auto* adPtr = ad.empty() ? nullptr : ad.data();
+        int len{ 0 };
+        const auto ad{ asU8(associatedData) };
+        const auto* adPtr{ ad.data() };
         if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
         {
             throw std::runtime_error("aeadDecrypt: add aad failed");
@@ -291,9 +291,9 @@ public:
         hepatizon::security::SecureBuffer plainText{};
         plainText.resize(box.cipherText.size());
 
-        int outLen = 0;
-        const auto* ctPtr = box.cipherText.empty() ? nullptr : box.cipherText.data();
-        auto* ptPtr = plainText.empty() ? nullptr : plainText.data();
+        int outLen{ 0 };
+        const auto* ctPtr{ box.cipherText.empty() ? nullptr : box.cipherText.data() };
+        auto* ptPtr{ plainText.empty() ? nullptr : plainText.data() };
         if (EVP_DecryptUpdate(ctx.get(), ptPtr, &outLen, ctPtr, static_cast<int>(box.cipherText.size())) != 1)
         {
             hepatizon::security::secureRelease(plainText);
@@ -311,8 +311,8 @@ public:
             throw std::runtime_error("aeadDecrypt: set tag failed");
         }
 
-        int finalLen = 0;
-        auto* ptFinalPtr = plainText.empty() ? nullptr : (plainText.data() + outLen);
+        int finalLen{ 0 };
+        auto* ptFinalPtr{ plainText.empty() ? nullptr : (plainText.data() + outLen) };
         if (EVP_DecryptFinal_ex(ctx.get(), ptFinalPtr, &finalLen) != 1)
         {
             hepatizon::security::secureRelease(plainText);

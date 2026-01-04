@@ -63,7 +63,7 @@ public:
     {
         requirePolicySupported(meta);
 
-        const auto saltBytes = std::span<const std::uint8_t>{ meta.salt };
+        const auto saltBytes{ std::span<const std::uint8_t>{ meta.salt } };
         return hepatizon::crypto::deriveMasterKeyArgon2id(password, asBytes(saltBytes), meta.argon2id);
     }
 
@@ -87,7 +87,7 @@ public:
         box.cipherText.resize(plainText.size());
 
         crypto_aead_ctx ctx{};
-        auto wipeCtx = hepatizon::security::scopeWipe(std::as_writable_bytes(std::span{ &ctx, 1 }));
+        auto wipeCtx{ hepatizon::security::scopeWipe(std::as_writable_bytes(std::span{ &ctx, 1 })) };
         crypto_aead_init_ietf(&ctx, key.data(), box.nonce.data());
         crypto_aead_write(&ctx, box.cipherText.data(), box.tag.data(), asU8(associatedData).data(),
                           associatedData.size(), asU8(plainText).data(), plainText.size());
@@ -109,10 +109,10 @@ public:
         plainText.resize(box.cipherText.size());
 
         crypto_aead_ctx ctx{};
-        auto wipeCtx = hepatizon::security::scopeWipe(std::as_writable_bytes(std::span{ &ctx, 1 }));
+        auto wipeCtx{ hepatizon::security::scopeWipe(std::as_writable_bytes(std::span{ &ctx, 1 })) };
         crypto_aead_init_ietf(&ctx, key.data(), box.nonce.data());
-        const int ok = crypto_aead_read(&ctx, plainText.data(), box.tag.data(), asU8(associatedData).data(),
-                                        associatedData.size(), box.cipherText.data(), box.cipherText.size());
+        const int ok{ crypto_aead_read(&ctx, plainText.data(), box.tag.data(), asU8(associatedData).data(),
+                                       associatedData.size(), box.cipherText.data(), box.cipherText.size()) };
         if (ok != 0)
         {
             hepatizon::security::secureRelease(plainText);

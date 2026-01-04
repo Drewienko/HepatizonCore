@@ -14,7 +14,7 @@ constexpr std::array<std::byte, g_vaultHeaderAadPrefixBytes> g_kAadPrefix{
     static_cast<std::byte>('H'), static_cast<std::byte>('D'), static_cast<std::byte>('R'), static_cast<std::byte>('1'),
 };
 
-constexpr std::size_t g_kU32Bytes{ hepatizon::core::detail::kU32Bytes };
+constexpr std::size_t g_kU32Bytes{ hepatizon::core::detail::g_kU32Bytes };
 
 void writeSalt(std::span<std::byte, hepatizon::crypto::g_argon2SaltBytes> out,
                const std::array<std::uint8_t, hepatizon::crypto::g_argon2SaltBytes>& salt) noexcept

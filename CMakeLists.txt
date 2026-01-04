@@ -44,7 +44,7 @@ function(hepc_set_common_warnings target)
     endif()
 endfunction()
 
-add_subdirectory(third_party/monocypher)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/third_party/monocypher.cmake")
 add_subdirectory(src)
 
 if(HEPC_ENABLE_TESTS)

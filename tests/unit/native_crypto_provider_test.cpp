@@ -31,7 +31,7 @@ std::span<const std::byte> asBytes(std::string_view s) noexcept
 
 TEST(NativeCryptoProvider, DeriveMasterKeyMatchesKdfBackend)
 {
-    auto provider = hepatizon::crypto::providers::makeNativeCryptoProvider();
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
 
     hepatizon::crypto::KdfMetadata meta{};
     meta.argon2id =
@@ -41,9 +41,9 @@ TEST(NativeCryptoProvider, DeriveMasterKeyMatchesKdfBackend)
 
     constexpr std::string_view kPassword{ "strongPassword" };
 
-    const auto a = provider->deriveMasterKey(asBytes(kPassword), meta);
-    const auto b = hepatizon::crypto::deriveMasterKeyArgon2id(
-        asBytes(kPassword), asBytes(std::span<const std::uint8_t>{ meta.salt }), meta.argon2id);
+    const auto a{ provider->deriveMasterKey(asBytes(kPassword), meta) };
+    const auto b{ hepatizon::crypto::deriveMasterKeyArgon2id(
+        asBytes(kPassword), asBytes(std::span<const std::uint8_t>{ meta.salt }), meta.argon2id) };
 
     ASSERT_EQ(a.size(), hepatizon::crypto::g_kMasterKeyBytes);
     ASSERT_EQ(b.size(), hepatizon::crypto::g_kMasterKeyBytes);
@@ -52,7 +52,7 @@ TEST(NativeCryptoProvider, DeriveMasterKeyMatchesKdfBackend)
 
 TEST(NativeCryptoProvider, AeadRoundTrip)
 {
-    auto provider = hepatizon::crypto::providers::makeNativeCryptoProvider();
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
 
     std::array<std::uint8_t, hepatizon::crypto::g_aeadKeyBytes> key{};
     for (std::size_t i{}; i < key.size(); ++i)
@@ -63,8 +63,8 @@ TEST(NativeCryptoProvider, AeadRoundTrip)
     constexpr std::string_view kAd{ "header" };
     constexpr std::string_view kPlain{ "secret-data" };
 
-    const auto box = provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes(kPlain), asBytes(kAd));
-    const auto decrypted = provider->aeadDecrypt(std::span<const std::uint8_t>{ key }, box, asBytes(kAd));
+    const auto box{ provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes(kPlain), asBytes(kAd)) };
+    const auto decrypted{ provider->aeadDecrypt(std::span<const std::uint8_t>{ key }, box, asBytes(kAd)) };
 
     ASSERT_TRUE(decrypted.has_value());
     const std::string_view decryptedView{ reinterpret_cast<const char*>(decrypted->data()), decrypted->size() };
@@ -73,7 +73,7 @@ TEST(NativeCryptoProvider, AeadRoundTrip)
 
 TEST(NativeCryptoProvider, AeadTamperFails)
 {
-    auto provider = hepatizon::crypto::providers::makeNativeCryptoProvider();
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
 
     std::array<std::uint8_t, hepatizon::crypto::g_aeadKeyBytes> key{};
     for (std::size_t i{}; i < key.size(); ++i)
@@ -84,16 +84,16 @@ TEST(NativeCryptoProvider, AeadTamperFails)
     constexpr std::string_view kAd{ "header" };
     constexpr std::string_view kPlain{ "secret-data" };
 
-    auto box = provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes(kPlain), asBytes(kAd));
+    auto box{ provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes(kPlain), asBytes(kAd)) };
     box.tag[0] ^= 0x01U;
 
-    const auto decrypted = provider->aeadDecrypt(std::span<const std::uint8_t>{ key }, box, asBytes(kAd));
+    const auto decrypted{ provider->aeadDecrypt(std::span<const std::uint8_t>{ key }, box, asBytes(kAd)) };
     EXPECT_FALSE(decrypted.has_value());
 }
 
 TEST(NativeCryptoProvider, RejectsWrongKeySize)
 {
-    auto provider = hepatizon::crypto::providers::makeNativeCryptoProvider();
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
 
     std::array<std::uint8_t, hepatizon::crypto::g_aeadKeyBytes - 1U> key{};
     EXPECT_THROW((void)provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes("x"), asBytes("")),

@@ -4,7 +4,6 @@
 #include "hepatizon/crypto/KdfMetadata.hpp"
 #include <array>
 #include <cstddef>
-#include <cstdint>
 
 namespace hepatizon::core
 {

@@ -5,7 +5,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -30,6 +32,46 @@ namespace hepatizon::test_utils
     return out;
 }
 
+[[nodiscard]] inline std::optional<std::string> getEnv(std::string_view name)
+{
+    if (name.empty())
+    {
+        return std::nullopt;
+    }
+
+#if defined(_WIN32)
+    // Use MSVC "secure" getenv replacement to avoid C4996 when /WX is enabled.
+    char* value{ nullptr };
+    std::size_t len{ 0U };
+    if (_dupenv_s(&value, &len, std::string{ name }.c_str()) != 0 || value == nullptr)
+    {
+        return std::nullopt;
+    }
+    std::string out{ value };
+    std::free(value);
+    return out;
+#else
+    const char* value{ std::getenv(std::string{ name }.c_str()) };
+    if (value == nullptr)
+    {
+        return std::nullopt;
+    }
+    return std::string{ value };
+#endif
+}
+
+[[nodiscard]] inline bool envFlagSet(std::string_view name)
+{
+    const auto value{ getEnv(name) };
+    if (!value.has_value())
+    {
+        return false;
+    }
+
+    // Treat any non-empty value other than "0" as enabled.
+    return !value->empty() && (*value != "0");
+}
+
 // Creates a unique directory inside the OS temp dir using OS CSPRNG.
 // The name is intentionally non-predictable to avoid security-sensitive patterns in publicly writable temp folders.
 [[nodiscard]] inline std::filesystem::path makeSecureTempDir(std::string_view prefix)
@@ -37,9 +79,51 @@ namespace hepatizon::test_utils
     constexpr std::size_t kTokenBytes{ 16U };
     constexpr std::size_t kMaxAttempts{ 16U };
 
-    const auto base = std::filesystem::temp_directory_path() / std::filesystem::path{ "hepatizoncore_tests" };
     std::error_code ec{};
-    (void)std::filesystem::create_directories(base, ec);
+    std::filesystem::path base{};
+    {
+        std::filesystem::path xdgRuntimeRoot{};
+        if (const auto xdgRuntimeDir{ getEnv("XDG_RUNTIME_DIR") }; xdgRuntimeDir.has_value() && !xdgRuntimeDir->empty())
+        {
+            xdgRuntimeRoot = std::filesystem::path{ *xdgRuntimeDir };
+        }
+        const std::filesystem::path tmpRoot{ std::filesystem::temp_directory_path() };
+
+        const std::array<std::filesystem::path, 2> roots{ xdgRuntimeRoot, tmpRoot };
+        for (const auto& root : roots)
+        {
+            if (root.empty())
+            {
+                continue;
+            }
+
+            const auto candidate{ root / std::filesystem::path{ "hepatizoncore_tests" } };
+            ec.clear();
+            (void)std::filesystem::create_directories(candidate, ec);
+            if (ec)
+            {
+                continue;
+            }
+            if (!std::filesystem::is_directory(candidate, ec) || ec)
+            {
+                continue;
+            }
+
+#if !defined(_WIN32)
+            // Try to ensure a private base directory even if umask is permissive.
+            std::filesystem::permissions(candidate, std::filesystem::perms::owner_all,
+                                         std::filesystem::perm_options::replace, ec);
+            ec.clear();
+#endif
+
+            base = candidate;
+            break;
+        }
+    }
+    if (base.empty())
+    {
+        return {};
+    }
 
     for (std::size_t attempt{}; attempt < kMaxAttempts; ++attempt)
     {
@@ -51,9 +135,14 @@ namespace hepatizon::test_utils
 
         std::string name{ prefix };
         name += toHex(std::span<const std::uint8_t>{ rnd });
-        const auto dir = base / std::filesystem::path{ name };
+        const auto dir{ base / std::filesystem::path{ name } };
         if (std::filesystem::create_directory(dir, ec) && !ec)
         {
+#if !defined(_WIN32)
+            std::filesystem::permissions(dir, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace,
+                                         ec);
+            ec.clear();
+#endif
             return dir;
         }
     }
@@ -64,4 +153,3 @@ namespace hepatizon::test_utils
 } // namespace hepatizon::test_utils
 
 #endif // HEPATIZON_TESTS_TEST_UTILS_TESTUTILS_HPP
-

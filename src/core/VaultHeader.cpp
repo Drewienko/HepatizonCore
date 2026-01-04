@@ -8,8 +8,8 @@ namespace hepatizon::core
 namespace
 {
 
-constexpr std::size_t g_kU32Bytes{ hepatizon::core::detail::kU32Bytes };
-constexpr std::size_t g_kU64Bytes{ hepatizon::core::detail::kU64Bytes };
+constexpr std::size_t g_kU32Bytes{ hepatizon::core::detail::g_kU32Bytes };
+constexpr std::size_t g_kU64Bytes{ hepatizon::core::detail::g_kU64Bytes };
 
 } // namespace
 

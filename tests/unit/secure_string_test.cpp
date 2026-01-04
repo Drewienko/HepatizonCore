@@ -31,7 +31,7 @@ TEST(SecureString, ToSecureBufferPreservesBytePatterns)
     const hepatizon::security::SecureBuffer b{ hepatizon::security::toSecureBuffer(s) };
 
     ASSERT_EQ(b.size(), input.size());
-    for (std::size_t i = 0U; i < b.size(); ++i)
+    for (std::size_t i{ 0U }; i < b.size(); ++i)
     {
         EXPECT_EQ(b[i], static_cast<std::uint8_t>(static_cast<unsigned char>(bytes[i])));
     }

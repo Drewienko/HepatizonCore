@@ -15,7 +15,7 @@ public:
     ScopeWipe(const ScopeWipe&) = delete;
     ScopeWipe& operator=(const ScopeWipe&) = delete;
 
-    explicit ScopeWipe(std::span<std::byte> b) noexcept : m_bytes{ b } {};
+    explicit ScopeWipe(std::span<std::byte> b) noexcept : m_bytes{ b } {}
 
     ScopeWipe(ScopeWipe&& sw) noexcept : m_bytes{ sw.m_bytes }, m_active{ sw.m_active }
     {

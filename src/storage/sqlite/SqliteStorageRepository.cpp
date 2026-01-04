@@ -79,9 +79,9 @@ void requireExactSize(std::span<const std::uint8_t> s, std::size_t expected, con
 void writeU32LE(std::ostream& out, std::uint32_t v)
 {
     std::array<std::uint8_t, 4> bytes{};
-    for (std::size_t i = 0; i < bytes.size(); ++i)
+    for (std::size_t i{ 0 }; i < bytes.size(); ++i)
     {
-        const std::uint32_t shiftBits = static_cast<std::uint32_t>(i) * g_kBitsPerByte;
+        const std::uint32_t shiftBits{ static_cast<std::uint32_t>(i) * g_kBitsPerByte };
         bytes[i] = static_cast<std::uint8_t>((v >> shiftBits) & g_kByteMaskU32);
     }
     out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
@@ -95,10 +95,10 @@ void writeU32LE(std::ostream& out, std::uint32_t v)
     {
         throw std::runtime_error("storage: failed to read u32");
     }
-    std::uint32_t v = 0U;
-    for (std::size_t i = 0; i < bytes.size(); ++i)
+    std::uint32_t v{ 0U };
+    for (std::size_t i{ 0 }; i < bytes.size(); ++i)
     {
-        const std::uint32_t shiftBits = static_cast<std::uint32_t>(i) * g_kBitsPerByte;
+        const std::uint32_t shiftBits{ static_cast<std::uint32_t>(i) * g_kBitsPerByte };
         v |= (static_cast<std::uint32_t>(bytes[i]) << shiftBits);
     }
     return v;
@@ -145,7 +145,7 @@ void writeMetaFile(const std::filesystem::path& path, const hepatizon::crypto::K
         throw std::runtime_error("storage: invalid metadata magic");
     }
 
-    const std::uint32_t version = readU32LE(in);
+    const std::uint32_t version{ readU32LE(in) };
     if (version != g_kMetaVersion)
     {
         throw std::runtime_error("storage: unsupported metadata version");
@@ -195,7 +195,7 @@ using SqliteStmtPtr = std::unique_ptr<sqlite3_stmt, SqliteStmtDeleter>;
 
 [[nodiscard]] std::string sqliteErr(sqlite3* db, const char* prefix)
 {
-    const char* msg = (db != nullptr) ? sqlite3_errmsg(db) : "no-db";
+    const char* msg{ (db != nullptr) ? sqlite3_errmsg(db) : "no-db" };
     std::string out{ prefix };
     out.append(": ");
     out.append(msg);
@@ -204,11 +204,11 @@ using SqliteStmtPtr = std::unique_ptr<sqlite3_stmt, SqliteStmtDeleter>;
 
 void exec(sqlite3* db, const char* sql)
 {
-    char* errMsg = nullptr;
-    const int rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
+    char* errMsg{ nullptr };
+    const int rc{ sqlite3_exec(db, sql, nullptr, nullptr, &errMsg) };
     if (rc != SQLITE_OK)
     {
-        std::string msg = sqliteErr(db, "storage: sqlite3_exec failed");
+        std::string msg{ sqliteErr(db, "storage: sqlite3_exec failed") };
         if (errMsg != nullptr)
         {
             msg.append(" (");
@@ -222,9 +222,9 @@ void exec(sqlite3* db, const char* sql)
 
 [[nodiscard]] SqliteDbPtr openDb(const std::filesystem::path& path, int flags)
 {
-    sqlite3* raw = nullptr;
-    const std::string filename = path.string();
-    const int rc = sqlite3_open_v2(filename.c_str(), &raw, flags, nullptr);
+    sqlite3* raw{ nullptr };
+    const std::string filename{ path.string() };
+    const int rc{ sqlite3_open_v2(filename.c_str(), &raw, flags, nullptr) };
     SqliteDbPtr db{ raw };
     if (rc != SQLITE_OK || !db)
     {
@@ -235,8 +235,8 @@ void exec(sqlite3* db, const char* sql)
 
 [[nodiscard]] SqliteStmtPtr prepare(sqlite3* db, const char* sql)
 {
-    sqlite3_stmt* rawStmt = nullptr;
-    const int rc = sqlite3_prepare_v2(db, sql, -1, &rawStmt, nullptr);
+    sqlite3_stmt* rawStmt{ nullptr };
+    const int rc{ sqlite3_prepare_v2(db, sql, -1, &rawStmt, nullptr) };
     SqliteStmtPtr stmt{ rawStmt };
     if (rc != SQLITE_OK || !stmt)
     {
@@ -265,8 +265,8 @@ void ensureSchema(sqlite3* db)
 void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, int ciphertextIndex,
                  const hepatizon::crypto::AeadBox& box)
 {
-    const auto nonce = std::span<const std::uint8_t>{ box.nonce };
-    const auto tag = std::span<const std::uint8_t>{ box.tag };
+    const auto nonce{ std::span<const std::uint8_t>{ box.nonce } };
+    const auto tag{ std::span<const std::uint8_t>{ box.tag } };
 
     if (sqlite3_bind_blob(stmt, nonceIndex, nonce.data(), checkedSqliteBytes(nonce.size(), "storage: nonce too large"),
                           SQLITE_STATIC) != SQLITE_OK)
@@ -279,8 +279,8 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
         throw std::runtime_error(sqliteErr(db, "storage: bind tag failed"));
     }
 
-    const int ctBytes = checkedSqliteBytes(box.cipherText.size(), "storage: ciphertext too large");
-    const void* ctPtr = nonNullPtrForSqliteBlob(box.cipherText.data(), ctBytes);
+    const int ctBytes{ checkedSqliteBytes(box.cipherText.size(), "storage: ciphertext too large") };
+    const void* ctPtr{ nonNullPtrForSqliteBlob(box.cipherText.data(), ctBytes) };
     if ((ctBytes > 0) && (ctPtr == nullptr))
     {
         throw std::runtime_error("storage: null ciphertext pointer");
@@ -293,14 +293,14 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
 
 [[nodiscard]] hepatizon::crypto::AeadBox readAeadBoxFromRow(sqlite3_stmt* stmt, const char* what)
 {
-    const void* noncePtr = sqlite3_column_blob(stmt, 0);
-    const int nonceBytes = sqlite3_column_bytes(stmt, 0);
+    const void* noncePtr{ sqlite3_column_blob(stmt, 0) };
+    const int nonceBytes{ sqlite3_column_bytes(stmt, 0) };
 
-    const void* tagPtr = sqlite3_column_blob(stmt, 1);
-    const int tagBytes = sqlite3_column_bytes(stmt, 1);
+    const void* tagPtr{ sqlite3_column_blob(stmt, 1) };
+    const int tagBytes{ sqlite3_column_bytes(stmt, 1) };
 
-    const void* ctPtr = sqlite3_column_blob(stmt, 2);
-    const int ctBytes = sqlite3_column_bytes(stmt, 2);
+    const void* ctPtr{ sqlite3_column_blob(stmt, 2) };
+    const int ctBytes{ sqlite3_column_bytes(stmt, 2) };
 
     if (nonceBytes < 0 || tagBytes < 0 || ctBytes < 0)
     {
@@ -312,17 +312,17 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
         throw std::runtime_error(what);
     }
 
-    const void* nonNullCtPtr = nonNullPtrForSqliteBlob(ctPtr, ctBytes);
+    const void* nonNullCtPtr{ nonNullPtrForSqliteBlob(ctPtr, ctBytes) };
     if ((ctBytes > 0) && (nonNullCtPtr == nullptr))
     {
         throw std::runtime_error(what);
     }
 
     hepatizon::crypto::AeadBox out{};
-    const auto nonceSpan = std::span<const std::uint8_t>{ static_cast<const std::uint8_t*>(noncePtr),
-                                                          static_cast<std::size_t>(nonceBytes) };
-    const auto tagSpan =
-        std::span<const std::uint8_t>{ static_cast<const std::uint8_t*>(tagPtr), static_cast<std::size_t>(tagBytes) };
+    const auto nonceSpan{ std::span<const std::uint8_t>{ static_cast<const std::uint8_t*>(noncePtr),
+                                                         static_cast<std::size_t>(nonceBytes) } };
+    const auto tagSpan{ std::span<const std::uint8_t>{ static_cast<const std::uint8_t*>(tagPtr),
+                                                       static_cast<std::size_t>(tagBytes) } };
 
     requireExactSize(nonceSpan, hepatizon::crypto::g_aeadNonceBytes, "storage: invalid nonce size");
     requireExactSize(tagSpan, hepatizon::crypto::g_aeadTagBytes, "storage: invalid tag size");
@@ -340,18 +340,19 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
 
 void upsertHeader(sqlite3* db, const hepatizon::crypto::AeadBox& header)
 {
-    const char* sql =
+    const char* sql{
         "INSERT INTO vault_header(id, nonce, tag, ciphertext) VALUES (?, ?, ?, ?)"
-        " ON CONFLICT(id) DO UPDATE SET nonce=excluded.nonce, tag=excluded.tag, ciphertext=excluded.ciphertext;";
+        " ON CONFLICT(id) DO UPDATE SET nonce=excluded.nonce, tag=excluded.tag, ciphertext=excluded.ciphertext;"
+    };
 
-    auto stmt = prepare(db, sql);
+    auto stmt{ prepare(db, sql) };
     if (sqlite3_bind_int(stmt.get(), 1, g_kHeaderRowId) != SQLITE_OK)
     {
         throw std::runtime_error(sqliteErr(db, "storage: bind id failed"));
     }
     bindAeadBox(db, stmt.get(), 2, 3, 4, header);
 
-    const int stepRc = sqlite3_step(stmt.get());
+    const int stepRc{ sqlite3_step(stmt.get()) };
     if (stepRc != SQLITE_DONE)
     {
         throw std::runtime_error(sqliteErr(db, "storage: upsert header failed"));
@@ -365,20 +366,21 @@ void upsertBlob(sqlite3* db, std::string_view key, const hepatizon::crypto::Aead
         throw std::invalid_argument("storage: empty blob key");
     }
 
-    const char* sql =
+    const char* sql{
         "INSERT INTO vault_blobs(key, nonce, tag, ciphertext) VALUES (?, ?, ?, ?)"
-        " ON CONFLICT(key) DO UPDATE SET nonce=excluded.nonce, tag=excluded.tag, ciphertext=excluded.ciphertext;";
+        " ON CONFLICT(key) DO UPDATE SET nonce=excluded.nonce, tag=excluded.tag, ciphertext=excluded.ciphertext;"
+    };
 
-    auto stmt = prepare(db, sql);
+    auto stmt{ prepare(db, sql) };
 
-    const int keyBytes = checkedSqliteBytes(key.size(), "storage: key too large");
+    const int keyBytes{ checkedSqliteBytes(key.size(), "storage: key too large") };
     if (sqlite3_bind_text(stmt.get(), 1, key.data(), keyBytes, SQLITE_TRANSIENT) != SQLITE_OK)
     {
         throw std::runtime_error(sqliteErr(db, "storage: bind key failed"));
     }
     bindAeadBox(db, stmt.get(), 2, 3, 4, value);
 
-    const int stepRc = sqlite3_step(stmt.get());
+    const int stepRc{ sqlite3_step(stmt.get()) };
     if (stepRc != SQLITE_DONE)
     {
         throw std::runtime_error(sqliteErr(db, "storage: upsert blob failed"));
@@ -392,17 +394,17 @@ void upsertBlob(sqlite3* db, std::string_view key, const hepatizon::crypto::Aead
         throw std::invalid_argument("storage: empty blob key");
     }
 
-    const char* sql = "SELECT nonce, tag, ciphertext FROM vault_blobs WHERE key = ?;";
+    const char* sql{ "SELECT nonce, tag, ciphertext FROM vault_blobs WHERE key = ?;" };
 
-    auto stmt = prepare(db, sql);
+    auto stmt{ prepare(db, sql) };
 
-    const int keyBytes = checkedSqliteBytes(key.size(), "storage: key too large");
+    const int keyBytes{ checkedSqliteBytes(key.size(), "storage: key too large") };
     if (sqlite3_bind_text(stmt.get(), 1, key.data(), keyBytes, SQLITE_TRANSIENT) != SQLITE_OK)
     {
         throw std::runtime_error(sqliteErr(db, "storage: bind key failed"));
     }
 
-    const int stepRc = sqlite3_step(stmt.get());
+    const int stepRc{ sqlite3_step(stmt.get()) };
     if (stepRc == SQLITE_DONE)
     {
         return std::nullopt;
@@ -417,15 +419,15 @@ void upsertBlob(sqlite3* db, std::string_view key, const hepatizon::crypto::Aead
 
 [[nodiscard]] hepatizon::crypto::AeadBox loadHeader(sqlite3* db)
 {
-    const char* sql = "SELECT nonce, tag, ciphertext FROM vault_header WHERE id = ?;";
-    auto stmt = prepare(db, sql);
+    const char* sql{ "SELECT nonce, tag, ciphertext FROM vault_header WHERE id = ?;" };
+    auto stmt{ prepare(db, sql) };
 
     if (sqlite3_bind_int(stmt.get(), 1, g_kHeaderRowId) != SQLITE_OK)
     {
         throw std::runtime_error(sqliteErr(db, "storage: bind id failed"));
     }
 
-    const int stepRc = sqlite3_step(stmt.get());
+    const int stepRc{ sqlite3_step(stmt.get()) };
     if (stepRc == SQLITE_ROW)
     {
         return readAeadBoxFromRow(stmt.get(), "storage: invalid vault_header row");
@@ -449,7 +451,7 @@ void ensureEmptyDirOrCreate(const std::filesystem::path& vaultDir)
             throw std::invalid_argument("storage: vaultDir is not a directory");
         }
 
-        auto it = std::filesystem::directory_iterator(vaultDir, ec);
+        auto it{ std::filesystem::directory_iterator(vaultDir, ec) };
         if (ec)
         {
             throw std::runtime_error("storage: failed to iterate vault directory");
@@ -474,25 +476,25 @@ public:
     {
         ensureEmptyDirOrCreate(vaultDir);
 
-        const auto metaPath = metaPathFor(vaultDir);
-        const auto dbPath = dbPathFor(vaultDir);
+        const auto metaPath{ metaPathFor(vaultDir) };
+        const auto dbPath{ dbPathFor(vaultDir) };
 
         writeMetaFile(metaPath, info.kdf);
 
-        auto db = openDb(dbPath, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE) };
         ensureSchema(db.get());
         upsertHeader(db.get(), info.encryptedHeader);
     }
 
     [[nodiscard]] hepatizon::storage::VaultInfo loadVaultInfo(const std::filesystem::path& vaultDir) const override
     {
-        const auto metaPath = metaPathFor(vaultDir);
-        const auto dbPath = dbPathFor(vaultDir);
+        const auto metaPath{ metaPathFor(vaultDir) };
+        const auto dbPath{ dbPathFor(vaultDir) };
 
         hepatizon::storage::VaultInfo info{};
         info.kdf = readMetaFile(metaPath);
 
-        auto db = openDb(dbPath, SQLITE_OPEN_READONLY);
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
         info.encryptedHeader = loadHeader(db.get());
         return info;
     }
@@ -500,8 +502,8 @@ public:
     void storeEncryptedHeader(const std::filesystem::path& vaultDir,
                               const hepatizon::crypto::AeadBox& encryptedHeader) override
     {
-        const auto dbPath = dbPathFor(vaultDir);
-        auto db = openDb(dbPath, SQLITE_OPEN_READWRITE);
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
         ensureSchema(db.get());
         upsertHeader(db.get(), encryptedHeader);
     }
@@ -509,8 +511,8 @@ public:
     void storeBlob(const std::filesystem::path& vaultDir, std::string_view key,
                    const hepatizon::crypto::AeadBox& value) override
     {
-        const auto dbPath = dbPathFor(vaultDir);
-        auto db = openDb(dbPath, SQLITE_OPEN_READWRITE);
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
         ensureSchema(db.get());
         upsertBlob(db.get(), key, value);
     }
@@ -518,8 +520,8 @@ public:
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox> loadBlob(const std::filesystem::path& vaultDir,
                                                                      std::string_view key) const override
     {
-        const auto dbPath = dbPathFor(vaultDir);
-        auto db = openDb(dbPath, SQLITE_OPEN_READONLY);
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
         return ::hepatizon::storage::sqlite::loadBlob(db.get(), key);
     }
 };

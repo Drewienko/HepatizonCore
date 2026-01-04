@@ -15,9 +15,9 @@ namespace
 [[nodiscard]] std::uint64_t unixSecondsNow() noexcept
 {
     using Clock = std::chrono::system_clock;
-    const auto now = Clock::now();
-    const auto secs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
-    const auto count = secs.count();
+    const auto now{ Clock::now() };
+    const auto secs{ std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()) };
+    const auto count{ secs.count() };
     if (count < 0)
     {
         return 0U;
@@ -53,12 +53,12 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
         return VaultError::CryptoError;
     }
 
-    const auto metaOpt = hepatizon::core::makeKdfMetadata(params);
+    const auto metaOpt{ hepatizon::core::makeKdfMetadata(params) };
     if (!metaOpt)
     {
         return VaultError::RandomFailed;
     }
-    const auto meta = *metaOpt;
+    const auto meta{ *metaOpt };
 
     hepatizon::security::SecureBuffer masterKey{};
     try
@@ -80,8 +80,8 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
         return VaultError::RandomFailed;
     }
 
-    const auto plain = encodeVaultHeaderV1(header);
-    const auto aad = encodeVaultHeaderAadV1(meta);
+    const auto plain{ encodeVaultHeaderV1(header) };
+    const auto aad{ encodeVaultHeaderAadV1(meta) };
     hepatizon::crypto::AeadBox encrypted{};
     try
     {
@@ -140,7 +140,7 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
     std::optional<hepatizon::security::SecureBuffer> plainOpt{};
     try
     {
-        const auto aad = encodeVaultHeaderAadV1(info.kdf);
+        const auto aad{ encodeVaultHeaderAadV1(info.kdf) };
         plainOpt = m_crypto->aeadDecrypt(masterKey, info.encryptedHeader,
                                          std::span<const std::byte>{ aad.data(), aad.size() });
     }
@@ -154,7 +154,7 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
         return VaultError::AuthFailed;
     }
 
-    const auto headerOpt = decodeVaultHeaderV1(hepatizon::security::asBytes(*plainOpt));
+    const auto headerOpt{ decodeVaultHeaderV1(hepatizon::security::asBytes(*plainOpt)) };
     if (!headerOpt)
     {
         return VaultError::InvalidVaultFormat;
@@ -165,7 +165,7 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
         return VaultError::MigrationRequired;
     }
 
-    auto header = *headerOpt;
+    auto header{ *headerOpt };
     if (header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
     {
         while (header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
@@ -182,8 +182,8 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
         hepatizon::crypto::AeadBox reEncrypted{};
         try
         {
-            const auto updatedPlain = encodeVaultHeaderV1(header);
-            const auto aad = encodeVaultHeaderAadV1(info.kdf);
+            const auto updatedPlain{ encodeVaultHeaderV1(header) };
+            const auto aad{ encodeVaultHeaderAadV1(info.kdf) };
             reEncrypted =
                 m_crypto->aeadEncrypt(masterKey, std::span<const std::byte>{ updatedPlain.data(), updatedPlain.size() },
                                       std::span<const std::byte>{ aad.data(), aad.size() });
@@ -219,8 +219,8 @@ VaultService::putSecret(const std::filesystem::path& vaultDir, const UnlockedVau
         return VaultError::InvalidVaultFormat;
     }
 
-    const auto keyChars = std::span<const char>{ key.data(), key.size() };
-    const auto aad = std::as_bytes(keyChars);
+    const auto keyChars{ std::span<const char>{ key.data(), key.size() } };
+    const auto aad{ std::as_bytes(keyChars) };
 
     hepatizon::crypto::AeadBox encrypted{};
     try
@@ -270,8 +270,8 @@ VaultService::getSecret(const std::filesystem::path& vaultDir, const UnlockedVau
         return VaultError::NotFound;
     }
 
-    const auto keyChars = std::span<const char>{ key.data(), key.size() };
-    const auto aad = std::as_bytes(keyChars);
+    const auto keyChars{ std::span<const char>{ key.data(), key.size() } };
+    const auto aad{ std::as_bytes(keyChars) };
 
     std::optional<hepatizon::security::SecureBuffer> plainOpt{};
     try

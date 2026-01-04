@@ -21,7 +21,7 @@ struct AeadBox final
 {
     std::array<std::uint8_t, g_aeadNonceBytes> nonce{};
     std::array<std::uint8_t, g_aeadTagBytes> tag{};
-    std::vector<std::uint8_t> cipherText{};
+    std::vector<std::uint8_t> cipherText;
 };
 
 class ICryptoProvider
