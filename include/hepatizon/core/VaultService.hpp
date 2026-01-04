@@ -98,7 +98,7 @@ public:
                                                         const hepatizon::crypto::Argon2idParams& params) noexcept;
 
     [[nodiscard]] VaultResult<UnlockedVault> unlockVault(const std::filesystem::path& vaultDir,
-                                                         std::span<const std::byte> password) noexcept;
+                                                         std::span<const std::byte> password);
 
     [[nodiscard]] VaultResult<std::monostate> putSecret(const std::filesystem::path& vaultDir, const UnlockedVault& v,
                                                         std::string_view key,

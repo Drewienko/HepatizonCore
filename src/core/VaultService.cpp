@@ -110,7 +110,7 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
 }
 
 [[nodiscard]] VaultResult<UnlockedVault> VaultService::unlockVault(const std::filesystem::path& vaultDir,
-                                                                   std::span<const std::byte> password) noexcept
+                                                                   std::span<const std::byte> password)
 {
     if (m_crypto == nullptr || m_storage == nullptr)
     {

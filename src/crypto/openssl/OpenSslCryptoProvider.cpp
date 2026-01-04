@@ -1,8 +1,10 @@
 #include "hepatizon/crypto/providers/OpenSslProviderFactory.hpp"
 #include "hepatizon/security/SecureBuffer.hpp"
 #include "hepatizon/security/SecureRandom.hpp"
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <openssl/core_names.h>
@@ -23,11 +25,6 @@ constexpr const char* g_kKdfParamArgon2Memcost{ "memcost" };
 constexpr const char* g_kKdfParamArgon2Lanes{ "lanes" };
 constexpr const char* g_kKdfParamThreads{ "threads" };
 constexpr const char* g_kKdfParamArgon2Version{ "version" };
-
-std::span<const std::uint8_t> asU8(std::span<const std::byte> s) noexcept
-{
-    return { reinterpret_cast<const std::uint8_t*>(s.data()), s.size() };
-}
 
 void requireExactSize(std::span<const std::uint8_t> s, std::size_t expected, const char* what)
 {
@@ -72,8 +69,7 @@ void requireArgon2idParamsSafe(const hepatizon::crypto::Argon2idParams& params)
         throw std::invalid_argument("deriveMasterKey: unsafe Argon2id parameters");
     }
 
-    const std::uint32_t minMemoryKiB{ params.parallelism * 8U };
-    if (params.memoryKiB < minMemoryKiB)
+    if (const std::uint32_t minMemoryKiB{ params.parallelism * 8U }; params.memoryKiB < minMemoryKiB)
     {
         throw std::invalid_argument("deriveMasterKey: invalid Argon2id parameters");
     }
@@ -91,7 +87,7 @@ using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX
 
 EvpKdfPtr fetchArgon2idKdf()
 {
-    if (EVP_KDF * kdf{ EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr) }; kdf != nullptr)
+    if (EVP_KDF* kdf{ EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr) }; kdf != nullptr)
     {
         return EvpKdfPtr{ kdf, &EVP_KDF_free };
     }
@@ -132,13 +128,17 @@ public:
         std::uint32_t threads{ meta.argon2id.parallelism };
         std::uint32_t version{ meta.argon2Version };
 
-        // OSSL_PARAM wants non-const pointers for octet strings.
-        auto* passPtr{ const_cast<std::uint8_t*>(asU8(password).data()) };
-        auto* saltPtr{ const_cast<std::uint8_t*>(meta.salt.data()) };
+        // OpenSSL's OSSL_PARAM API uses non-const pointers even for read-only octet string inputs.
+        // To avoid const_cast (and any risk of a provider writing through the pointer), copy inputs to local buffers.
+        hepatizon::security::SecureBuffer passwordCopy{};
+        passwordCopy.resize(password.size());
+        std::memcpy(passwordCopy.data(), password.data(), password.size());
+
+        auto saltCopy{ meta.salt };
 
         OSSL_PARAM params[]{
-            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, passPtr, password.size()),
-            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, saltPtr, meta.salt.size()),
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD, passwordCopy.data(), passwordCopy.size()),
+            OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, saltCopy.data(), saltCopy.size()),
             OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ITER, &iter),
             OSSL_PARAM_construct_uint32(g_kKdfParamArgon2Memcost, &memcostKiB),
             OSSL_PARAM_construct_uint32(g_kKdfParamArgon2Lanes, &lanes),
@@ -201,19 +201,17 @@ public:
         }
 
         int len{ 0 };
-        const auto ad{ asU8(associatedData) };
-        const auto* adPtr{ ad.data() };
-        if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
+        const auto* adPtr{ reinterpret_cast<const unsigned char*>(associatedData.data()) };
+        if (EVP_EncryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(associatedData.size())) != 1)
         {
             throw std::runtime_error("aeadEncrypt: add aad failed");
         }
 
         box.cipherText.resize(plainText.size());
-        const auto pt{ asU8(plainText) };
         int outLen{ 0 };
-        const auto* ptPtr{ pt.data() };
+        const auto* ptPtr{ reinterpret_cast<const unsigned char*>(plainText.data()) };
         auto* ctPtr{ box.cipherText.empty() ? nullptr : box.cipherText.data() };
-        if (EVP_EncryptUpdate(ctx.get(), ctPtr, &outLen, ptPtr, static_cast<int>(pt.size())) != 1)
+        if (EVP_EncryptUpdate(ctx.get(), ctPtr, &outLen, ptPtr, static_cast<int>(plainText.size())) != 1)
         {
             throw std::runtime_error("aeadEncrypt: encrypt update failed");
         }
@@ -281,9 +279,8 @@ public:
         }
 
         int len{ 0 };
-        const auto ad{ asU8(associatedData) };
-        const auto* adPtr{ ad.data() };
-        if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(ad.size())) != 1)
+        const auto* adPtr{ reinterpret_cast<const unsigned char*>(associatedData.data()) };
+        if (EVP_DecryptUpdate(ctx.get(), nullptr, &len, adPtr, static_cast<int>(associatedData.size())) != 1)
         {
             throw std::runtime_error("aeadDecrypt: add aad failed");
         }
@@ -305,8 +302,8 @@ public:
             return std::nullopt;
         }
 
-        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(box.tag.size()),
-                                const_cast<std::uint8_t*>(box.tag.data())) != 1)
+        std::array<std::uint8_t, hepatizon::crypto::g_aeadTagBytes> tagCopy{ box.tag };
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(tagCopy.size()), tagCopy.data()) != 1)
         {
             throw std::runtime_error("aeadDecrypt: set tag failed");
         }

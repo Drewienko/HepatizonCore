@@ -16,6 +16,90 @@
 namespace hepatizon::test_utils
 {
 
+[[nodiscard]] inline std::optional<std::string> getEnv(std::string_view name);
+
+namespace detail
+{
+
+[[nodiscard]] inline std::filesystem::path xdgRuntimeRoot() noexcept
+{
+    std::filesystem::path root{};
+    if (const auto xdgRuntimeDir{ getEnv("XDG_RUNTIME_DIR") }; xdgRuntimeDir.has_value() && !xdgRuntimeDir->empty())
+    {
+        root = std::filesystem::path{ *xdgRuntimeDir };
+    }
+    return root;
+}
+
+[[nodiscard]] inline bool tryPrepareBaseDir(const std::filesystem::path& candidate) noexcept
+{
+    std::error_code ec{};
+
+#if !defined(_WIN32)
+    ec.clear();
+    const bool existed{ std::filesystem::exists(candidate, ec) };
+    if (ec)
+    {
+        return false;
+    }
+    if (!existed)
+    {
+        ec.clear();
+        if (!std::filesystem::create_directories(candidate, ec) || ec)
+        {
+            return false;
+        }
+    }
+
+    ec.clear();
+    if (!std::filesystem::is_directory(candidate, ec) || ec)
+    {
+        return false;
+    }
+
+    // Ensure the base dir isn't usable if we can't make it private.
+    ec.clear();
+    std::filesystem::permissions(candidate, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace,
+                                 ec);
+    if (ec)
+    {
+        return false;
+    }
+
+    ec.clear();
+    const auto perms{ std::filesystem::status(candidate, ec).permissions() };
+    if (ec)
+    {
+        return false;
+    }
+    const auto publicBits{ std::filesystem::perms::group_all | std::filesystem::perms::others_all };
+    return ((perms & publicBits) == std::filesystem::perms::none);
+#else
+    ec.clear();
+    if (!std::filesystem::create_directories(candidate, ec) && ec)
+    {
+        return false;
+    }
+    ec.clear();
+    return std::filesystem::is_directory(candidate, ec) && !ec;
+#endif
+}
+
+[[nodiscard]] inline bool tryHardenNewDir(const std::filesystem::path& dir) noexcept
+{
+#if defined(_WIN32)
+    (void)dir;
+    return true;
+#else
+    std::error_code ec{};
+    ec.clear();
+    std::filesystem::permissions(dir, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace, ec);
+    return !ec;
+#endif
+}
+
+} // namespace detail
+
 [[nodiscard]] inline std::string toHex(std::span<const std::uint8_t> bytes)
 {
     constexpr char kHex[] = "0123456789abcdef";
@@ -79,17 +163,10 @@ namespace hepatizon::test_utils
     constexpr std::size_t kTokenBytes{ 16U };
     constexpr std::size_t kMaxAttempts{ 16U };
 
-    std::error_code ec{};
     std::filesystem::path base{};
     {
-        std::filesystem::path xdgRuntimeRoot{};
-        if (const auto xdgRuntimeDir{ getEnv("XDG_RUNTIME_DIR") }; xdgRuntimeDir.has_value() && !xdgRuntimeDir->empty())
-        {
-            xdgRuntimeRoot = std::filesystem::path{ *xdgRuntimeDir };
-        }
         const std::filesystem::path tmpRoot{ std::filesystem::temp_directory_path() };
-
-        const std::array<std::filesystem::path, 2> roots{ xdgRuntimeRoot, tmpRoot };
+        const std::array<std::filesystem::path, 2> roots{ detail::xdgRuntimeRoot(), tmpRoot };
         for (const auto& root : roots)
         {
             if (root.empty())
@@ -98,23 +175,10 @@ namespace hepatizon::test_utils
             }
 
             const auto candidate{ root / std::filesystem::path{ "hepatizoncore_tests" } };
-            ec.clear();
-            (void)std::filesystem::create_directories(candidate, ec);
-            if (ec)
+            if (!detail::tryPrepareBaseDir(candidate))
             {
                 continue;
             }
-            if (!std::filesystem::is_directory(candidate, ec) || ec)
-            {
-                continue;
-            }
-
-#if !defined(_WIN32)
-            // Try to ensure a private base directory even if umask is permissive.
-            std::filesystem::permissions(candidate, std::filesystem::perms::owner_all,
-                                         std::filesystem::perm_options::replace, ec);
-            ec.clear();
-#endif
 
             base = candidate;
             break;
@@ -136,13 +200,16 @@ namespace hepatizon::test_utils
         std::string name{ prefix };
         name += toHex(std::span<const std::uint8_t>{ rnd });
         const auto dir{ base / std::filesystem::path{ name } };
+
+        std::error_code ec{};
         if (std::filesystem::create_directory(dir, ec) && !ec)
         {
-#if !defined(_WIN32)
-            std::filesystem::permissions(dir, std::filesystem::perms::owner_all, std::filesystem::perm_options::replace,
-                                         ec);
-            ec.clear();
-#endif
+            if (!detail::tryHardenNewDir(dir))
+            {
+                ec.clear();
+                std::filesystem::remove_all(dir, ec);
+                continue;
+            }
             return dir;
         }
     }

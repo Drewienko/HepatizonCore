@@ -38,35 +38,80 @@ struct ScenarioResult final
 namespace detail
 {
 
-constexpr std::string_view g_kVaultTestPassword{ "correct horse battery staple" };
-
-struct ScenarioCleanup final
+class ScenarioCleanup final
 {
-    explicit ScenarioCleanup(std::filesystem::path d) : dir{ std::move(d) } {}
+public:
+    explicit ScenarioCleanup(std::filesystem::path d) : m_dir{ std::move(d) }
+    {
+    }
 
     ScenarioCleanup(const ScenarioCleanup&) = delete;
     ScenarioCleanup& operator=(const ScenarioCleanup&) = delete;
 
     ~ScenarioCleanup() noexcept
     {
-        wipePassword.release();
-        hepatizon::security::secureRelease(password);
+        hepatizon::security::secureRelease(m_password);
 
         std::error_code ec{};
-        if (!dir.empty())
+        if (!m_dir.empty())
         {
-            std::filesystem::remove_all(dir, ec);
+            std::filesystem::remove_all(m_dir, ec);
         }
     }
 
-    std::filesystem::path dir;
-    hepatizon::security::SecureString password{ hepatizon::security::secureStringFrom(g_kVaultTestPassword) };
-    hepatizon::security::ScopeWipe wipePassword{ hepatizon::security::scopeWipe(password) };
+    [[nodiscard]] std::filesystem::path& dir() noexcept
+    {
+        return m_dir;
+    }
+
+    [[nodiscard]] const std::filesystem::path& dir() const noexcept
+    {
+        return m_dir;
+    }
+
+    [[nodiscard]] hepatizon::security::SecureString& password() noexcept
+    {
+        return m_password;
+    }
+
+    [[nodiscard]] const hepatizon::security::SecureString& password() const noexcept
+    {
+        return m_password;
+    }
+
+private:
+    std::filesystem::path m_dir;
+    hepatizon::security::SecureString m_password;
 };
 
-[[nodiscard]] inline std::variant<std::filesystem::path, ScenarioResult> makeTempDirOrFail(std::string_view prefix) noexcept
+[[nodiscard]] inline bool initScenarioPassword(ScenarioCleanup& cleanup) noexcept
 {
-    const auto dir{ hepatizon::test_utils::makeSecureTempDir(prefix) };
+    // Avoid hard-coded passwords in tests: generate a per-run random passphrase.
+    constexpr std::size_t kTokenBytes{ 16U };
+    constexpr char kHex[] = "0123456789abcdef";
+    constexpr std::uint8_t kNibbleShift{ 4U };
+    constexpr std::uint8_t kNibbleMask{ 0x0FU };
+
+    std::array<std::uint8_t, kTokenBytes> rnd{};
+    if (!hepatizon::security::secureRandomFill(std::span<std::uint8_t>{ rnd }))
+    {
+        return false;
+    }
+
+    cleanup.password().resize(kTokenBytes * 2U);
+    for (std::size_t i{}; i < rnd.size(); ++i)
+    {
+        const std::uint8_t b{ rnd[i] };
+        cleanup.password()[(i * 2U) + 0U] = kHex[(b >> kNibbleShift) & kNibbleMask];
+        cleanup.password()[(i * 2U) + 1U] = kHex[b & kNibbleMask];
+    }
+    return true;
+}
+
+[[nodiscard]] inline std::variant<std::filesystem::path, ScenarioResult>
+makeTempDirOrFail(std::string_view prefix) noexcept
+{
+    auto dir{ hepatizon::test_utils::makeSecureTempDir(prefix) };
     if (dir.empty())
     {
         ADD_FAILURE() << "failed to create temp dir";
@@ -130,24 +175,30 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                                                           std::string_view tempPrefix,
                                                                           bool allowSkipUnsupportedKdf) noexcept
 {
-    const auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
+    auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))
     {
         return std::get<ScenarioResult>(dirOrErr);
     }
-    detail::ScenarioCleanup cleanup{ std::get<std::filesystem::path>(dirOrErr) };
+    detail::ScenarioCleanup cleanup{ std::move(std::get<std::filesystem::path>(dirOrErr)) };
+    if (!detail::initScenarioPassword(cleanup))
+    {
+        ADD_FAILURE() << "CSPRNG failure";
+        return { ScenarioOutcome::Failed, {} };
+    }
 
     auto storage{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     hepatizon::core::VaultService service{ crypto, *storage };
 
-    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir, cleanup.password, allowSkipUnsupportedKdf) };
+    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir(), cleanup.password(),
+                                                         allowSkipUnsupportedKdf) };
     if (std::holds_alternative<ScenarioResult>(createdOrErr))
     {
         return std::get<ScenarioResult>(createdOrErr);
     }
     const auto created{ std::get<hepatizon::core::CreatedVault>(createdOrErr) };
 
-    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir, cleanup.password) };
+    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir(), cleanup.password()) };
     if (std::holds_alternative<ScenarioResult>(unlockedOrErr))
     {
         return std::get<ScenarioResult>(unlockedOrErr);
@@ -157,7 +208,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     // AEAD authentication should fail if AAD does not match (empty AAD here).
     try
     {
-        const auto storedInfo{ storage->loadVaultInfo(cleanup.dir) };
+        const auto storedInfo{ storage->loadVaultInfo(cleanup.dir()) };
         const auto wrongAad{ crypto.aeadDecrypt(unlocked.masterKey(), storedInfo.encryptedHeader, {}) };
         if (wrongAad.has_value())
         {
@@ -205,7 +256,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
 
     auto value{ hepatizon::security::secureStringFrom(kValue) };
     auto wipeValue{ hepatizon::security::scopeWipe(value) };
-    const auto putRes{ service.putSecret(cleanup.dir, unlocked, kKey, value) };
+    const auto putRes{ service.putSecret(cleanup.dir(), unlocked, kKey, value) };
     wipeValue.release();
     hepatizon::security::secureRelease(value);
     if (!std::holds_alternative<std::monostate>(putRes))
@@ -214,7 +265,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    auto getRes{ service.getSecret(cleanup.dir, unlocked, kKey) };
+    auto getRes{ service.getSecret(cleanup.dir(), unlocked, kKey) };
     if (!std::holds_alternative<hepatizon::security::SecureString>(getRes))
     {
         ADD_FAILURE() << "getSecret failed";
@@ -232,7 +283,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     wipeLoaded.release();
     hepatizon::security::secureRelease(loaded);
 
-    const auto missingRes{ service.getSecret(cleanup.dir, unlocked, "missing.key") };
+    const auto missingRes{ service.getSecret(cleanup.dir(), unlocked, "missing.key") };
     if (!std::holds_alternative<hepatizon::core::VaultError>(missingRes) ||
         std::get<hepatizon::core::VaultError>(missingRes) != hepatizon::core::VaultError::NotFound)
     {
@@ -241,9 +292,15 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     }
 
     // Wrong password should fail authentication (but not crash).
-    auto wrongPassword{ hepatizon::security::secureStringFrom("wrong password") };
+    auto wrongPassword{ cleanup.password() };
+    if (wrongPassword.empty())
+    {
+        ADD_FAILURE() << "test invariant violated: password is empty";
+        return { ScenarioOutcome::Failed, {} };
+    }
+    wrongPassword[0] = (wrongPassword[0] == '0') ? '1' : '0';
     auto wipeWrongPassword{ hepatizon::security::scopeWipe(wrongPassword) };
-    const auto wrongUnlock{ service.unlockVault(cleanup.dir, hepatizon::security::asBytes(wrongPassword)) };
+    const auto wrongUnlock{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(wrongPassword)) };
     wipeWrongPassword.release();
     hepatizon::security::secureRelease(wrongPassword);
     if (!std::holds_alternative<hepatizon::core::VaultError>(wrongUnlock) ||
@@ -260,24 +317,30 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                                                        std::string_view tempPrefix,
                                                                        bool allowSkipUnsupportedKdf) noexcept
 {
-    const auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
+    auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))
     {
         return std::get<ScenarioResult>(dirOrErr);
     }
-    detail::ScenarioCleanup cleanup{ std::get<std::filesystem::path>(dirOrErr) };
+    detail::ScenarioCleanup cleanup{ std::move(std::get<std::filesystem::path>(dirOrErr)) };
+    if (!detail::initScenarioPassword(cleanup))
+    {
+        ADD_FAILURE() << "CSPRNG failure";
+        return { ScenarioOutcome::Failed, {} };
+    }
 
     auto storage{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     hepatizon::core::VaultService service{ crypto, *storage };
 
-    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir, cleanup.password, allowSkipUnsupportedKdf) };
+    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir(), cleanup.password(),
+                                                         allowSkipUnsupportedKdf) };
     if (std::holds_alternative<ScenarioResult>(createdOrErr))
     {
         return std::get<ScenarioResult>(createdOrErr);
     }
     (void)std::get<hepatizon::core::CreatedVault>(createdOrErr);
 
-    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir, cleanup.password) };
+    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir(), cleanup.password()) };
     if (std::holds_alternative<ScenarioResult>(unlockedOrErr))
     {
         return std::get<ScenarioResult>(unlockedOrErr);
@@ -294,7 +357,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
     {
-        storage->storeEncryptedHeader(cleanup.dir, encrypted);
+        storage->storeEncryptedHeader(cleanup.dir(), encrypted);
     }
     catch (...)
     {
@@ -302,7 +365,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    const auto unlockAgain{ service.unlockVault(cleanup.dir, hepatizon::security::asBytes(cleanup.password)) };
+    const auto unlockAgain{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(cleanup.password())) };
     if (!std::holds_alternative<hepatizon::core::VaultError>(unlockAgain) ||
         std::get<hepatizon::core::VaultError>(unlockAgain) != hepatizon::core::VaultError::MigrationRequired)
     {
@@ -317,24 +380,30 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                                                      std::string_view tempPrefix,
                                                                      bool allowSkipUnsupportedKdf) noexcept
 {
-    const auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
+    auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))
     {
         return std::get<ScenarioResult>(dirOrErr);
     }
-    detail::ScenarioCleanup cleanup{ std::get<std::filesystem::path>(dirOrErr) };
+    detail::ScenarioCleanup cleanup{ std::move(std::get<std::filesystem::path>(dirOrErr)) };
+    if (!detail::initScenarioPassword(cleanup))
+    {
+        ADD_FAILURE() << "CSPRNG failure";
+        return { ScenarioOutcome::Failed, {} };
+    }
 
     auto storage{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     hepatizon::core::VaultService service{ crypto, *storage };
 
-    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir, cleanup.password, allowSkipUnsupportedKdf) };
+    const auto createdOrErr{ detail::createVaultOrResult(service, cleanup.dir(), cleanup.password(),
+                                                         allowSkipUnsupportedKdf) };
     if (std::holds_alternative<ScenarioResult>(createdOrErr))
     {
         return std::get<ScenarioResult>(createdOrErr);
     }
     (void)std::get<hepatizon::core::CreatedVault>(createdOrErr);
 
-    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir, cleanup.password) };
+    auto unlockedOrErr{ detail::unlockVaultOrResult(service, cleanup.dir(), cleanup.password()) };
     if (std::holds_alternative<ScenarioResult>(unlockedOrErr))
     {
         return std::get<ScenarioResult>(unlockedOrErr);
@@ -351,7 +420,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
     {
-        storage->storeEncryptedHeader(cleanup.dir, encrypted);
+        storage->storeEncryptedHeader(cleanup.dir(), encrypted);
     }
     catch (...)
     {
@@ -359,7 +428,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    auto unlockAfter{ service.unlockVault(cleanup.dir, hepatizon::security::asBytes(cleanup.password)) };
+    auto unlockAfter{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(cleanup.password())) };
     if (std::holds_alternative<hepatizon::core::VaultError>(unlockAfter))
     {
         ADD_FAILURE() << "unlockVault failed after migration";

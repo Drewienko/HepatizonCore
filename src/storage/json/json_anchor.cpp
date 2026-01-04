@@ -1,4 +1,4 @@
 namespace hepatizon::storage::json
 {
-[[maybe_unused]] const int json_anchor{ 0 };
+[[maybe_unused]] constexpr int g_jsonAnchor{ 0 };
 } // namespace hepatizon::storage::json

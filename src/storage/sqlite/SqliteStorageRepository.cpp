@@ -35,7 +35,7 @@ constexpr std::array<std::uint8_t, 8> g_kMetaMagic{ 'H', 'E', 'P', 'C', 'M', 'E'
 constexpr std::uint32_t g_kMetaVersion{ 1U };
 
 constexpr int g_kHeaderRowId{ 1 };
-constexpr std::uint8_t g_kEmptyBlobByte{ 0U };
+constexpr std::byte g_kEmptyBlobByte{ std::byte{ 0 } };
 
 constexpr std::uint32_t g_kByteMaskU32{ 0xFFU };
 constexpr std::uint32_t g_kBitsPerByte{ 8U };
@@ -67,7 +67,7 @@ void requireExactSize(std::span<const std::uint8_t> s, std::size_t expected, con
     return static_cast<int>(n);
 }
 
-[[nodiscard]] const void* nonNullPtrForSqliteBlob(const void* ptr, int bytes)
+[[nodiscard]] const std::byte* nonNullPtrForSqliteBlob(const std::byte* ptr, int bytes)
 {
     if (bytes == 0)
     {
@@ -280,12 +280,12 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
     }
 
     const int ctBytes{ checkedSqliteBytes(box.cipherText.size(), "storage: ciphertext too large") };
-    const void* ctPtr{ nonNullPtrForSqliteBlob(box.cipherText.data(), ctBytes) };
+    const std::byte* ctPtr{ nonNullPtrForSqliteBlob(std::as_bytes(std::span{ box.cipherText }).data(), ctBytes) };
     if ((ctBytes > 0) && (ctPtr == nullptr))
     {
         throw std::runtime_error("storage: null ciphertext pointer");
     }
-    if (sqlite3_bind_blob(stmt, ciphertextIndex, ctPtr, ctBytes, SQLITE_STATIC) != SQLITE_OK)
+    if (sqlite3_bind_blob(stmt, ciphertextIndex, static_cast<const void*>(ctPtr), ctBytes, SQLITE_STATIC) != SQLITE_OK)
     {
         throw std::runtime_error(sqliteErr(db, "storage: bind ciphertext failed"));
     }
@@ -312,7 +312,7 @@ void bindAeadBox(sqlite3* db, sqlite3_stmt* stmt, int nonceIndex, int tagIndex, 
         throw std::runtime_error(what);
     }
 
-    const void* nonNullCtPtr{ nonNullPtrForSqliteBlob(ctPtr, ctBytes) };
+    const std::byte* nonNullCtPtr{ nonNullPtrForSqliteBlob(static_cast<const std::byte*>(ctPtr), ctBytes) };
     if ((ctBytes > 0) && (nonNullCtPtr == nullptr))
     {
         throw std::runtime_error(what);

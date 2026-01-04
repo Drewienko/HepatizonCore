@@ -16,17 +16,13 @@ namespace hepatizon::security
         return false;
     }
 
-    volatile unsigned char diff{};
-
+    volatile std::uint8_t diff{};
     for (std::size_t i{}; i < a.size(); ++i)
     {
-        const unsigned char x{ std::to_integer<unsigned char>(a[i]) };
-        const unsigned char y{ std::to_integer<unsigned char>(b[i]) };
-
-        diff |= (x ^ y);
+        diff |= std::to_integer<std::uint8_t>(a[i] ^ b[i]);
     }
 
-    return (diff == 0);
+    return (diff == 0U);
 }
 
 [[nodiscard]] inline bool secureEquals(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b) noexcept

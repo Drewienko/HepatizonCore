@@ -1,4 +1,4 @@
 namespace hepatizon::security
 {
-[[maybe_unused]] const int security_anchor{ 0 };
+[[maybe_unused]] constexpr int g_securityAnchor{ 0 };
 } // namespace hepatizon::security

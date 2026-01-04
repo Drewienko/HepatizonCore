@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 
 #include "hepatizon/security/MemoryWiper.hpp"
@@ -12,9 +13,12 @@ namespace
 
 struct NonTrivial
 {
-    ~NonTrivial()
-    {
-    }
+public:
+    NonTrivial() = default;
+    ~NonTrivial() = default;
+
+private:
+    std::unique_ptr<int> m_p;
 };
 
 template <typename T>
