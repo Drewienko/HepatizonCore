@@ -139,12 +139,13 @@ jobs:
       - name: Generate coverage report (gcovr -> SonarQube XML)
         if: env.SONAR_TOKEN != ''
         run: |
-          cd out/build/linux-coverage-gcc
-          gcovr -r ../.. --sonarqube coverage.xml \
-            --exclude '../../third_party/' \
-            --exclude '../../vcpkg/' \
-            --exclude '../../out/' \
-            --exclude '../../tests/'
+          gcovr -r . --sonarqube out/build/linux-coverage-gcc/coverage.xml \
+            --object-directory out/build/linux-coverage-gcc \
+            --gcov-ignore-errors=no_working_dir_found \
+            --exclude 'third_party/' \
+            --exclude 'vcpkg/' \
+            --exclude 'out/' \
+            --exclude 'tests/'
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN != ''
@@ -157,5 +158,9 @@ jobs:
             "-Dsonar.host.url=https://sonarcloud.io"
             "-Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}"
             "-Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}"
+            "-Dsonar.sources=include,src,adapters,internal/include"
+            "-Dsonar.tests=tests"
+            "-Dsonar.cfamily.compile-commands=out/build/linux-coverage-gcc/compile_commands.json"
             "-Dsonar.coverageReportPaths=out/build/linux-coverage-gcc/coverage.xml"
             "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**"
+            "-Dsonar.cpd.exclusions=tests/**"
