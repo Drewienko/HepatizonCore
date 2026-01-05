@@ -2,7 +2,7 @@
 
 HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a temporary debug CLI harness and an optional Qt 6 GUI stub.
 
-> Status (2026-01-05): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/open/rekey + encrypted secret blobs. Rekey does not re-encrypt stored blobs (the vault uses a random secrets key stored inside the encrypted header). What’s missing: the final vault DB schema + full DB migrations (only header schema versioning + a tiny header migration exists), and real CLI/GUI features.
+> Status (2026-01-05): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/open/rekey + encrypted secret blobs. Rekey does not re-encrypt stored blobs (the vault uses a random secrets key stored inside the encrypted header). Auto-migration exists only for the vault header schema (v1 -> v2). What’s missing: the final vault DB schema + real DB migrations, and real CLI/GUI features.
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
@@ -108,7 +108,7 @@ HepatizonCore/
 ## Storage (current direction)
 Vaults are stored as a directory containing two files:
 - `vault.meta` (plaintext): versioned KDF metadata required to derive the master key (`KdfMetadata`). Salt is stored here (salt is not secret).
-- `vault.db` (SQLite): stores encrypted application payloads as AEAD blobs (`AeadBox`). On Windows the adapter can be built against SQLCipher (`HEPC_STORAGE_USE_SQLCIPHER`), but the “encrypted database at rest” story is not finished yet.
+- `vault.db` (SQLite): stores encrypted application payloads as AEAD blobs (`AeadBox`). On Windows the adapter can be built against SQLCipher (`HEPC_STORAGE_USE_SQLCIPHER`), but the “encrypted database at rest” story is not finished yet (it currently links to SQLCipher, but does not set a DB key).
 
 The current SQLite adapter persists a single encrypted “vault header” row (`vault_header`, `id = 1`) containing `{nonce, tag, ciphertext}`. The header payload is a small, versioned binary struct encrypted via `ICryptoProvider` (header version, vault id, created-at timestamp, DB schema version, and the vault secrets key used to encrypt stored blobs).
 

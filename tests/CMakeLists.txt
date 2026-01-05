@@ -10,9 +10,11 @@ if(GTest_FOUND)
         unit/secure_buffer_test.cpp
         unit/secure_string_test.cpp
         unit/scope_wipe_test.cpp
+        unit/secure_random_test.cpp
         unit/key_derivation_test.cpp
         unit/native_crypto_provider_test.cpp
         unit/sqlite_storage_repository_test.cpp
+        unit/vault_service_error_test.cpp
         unit/vault_service_native_integration_test.cpp
     )
     target_include_directories(hepatizoncore_tests PRIVATE

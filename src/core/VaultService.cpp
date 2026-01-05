@@ -55,7 +55,7 @@ loadVaultInfoOrError(hepatizon::storage::IStorageRepository& storage, const std:
 struct ParsedHeader final
 {
     VaultHeader header{};
-    hepatizon::security::SecureBuffer secretsKey{};
+    hepatizon::security::SecureBuffer secretsKey;
     bool shouldStoreHeader{ false };
 };
 

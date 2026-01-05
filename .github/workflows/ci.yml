@@ -119,6 +119,8 @@ jobs:
           -DHEPC_ENABLE_OPENSSL=OFF
           -DHEPC_ENABLE_SANITIZERS=OFF
           -DHEPC_ENABLE_WARNINGS_AS_ERRORS=ON
+          -DHEPC_BUILD_CLI=OFF
+          -DHEPC_BUILD_GUI=OFF
           -DCMAKE_C_COMPILER=gcc
           -DCMAKE_CXX_COMPILER=g++
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
@@ -145,6 +147,7 @@ jobs:
             --exclude 'third_party/' \
             --exclude 'vcpkg/' \
             --exclude 'out/' \
+            --exclude 'src/ui/' \
             --exclude 'tests/'
 
       - name: SonarCloud Scan
@@ -162,5 +165,5 @@ jobs:
             "-Dsonar.tests=tests"
             "-Dsonar.cfamily.compile-commands=out/build/linux-coverage-gcc/compile_commands.json"
             "-Dsonar.coverageReportPaths=out/build/linux-coverage-gcc/coverage.xml"
-            "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**"
+            "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**,src/ui/**"
             "-Dsonar.cpd.exclusions=tests/**"

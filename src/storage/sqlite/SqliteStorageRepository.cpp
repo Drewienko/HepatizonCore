@@ -229,7 +229,7 @@ void exec(sqlite3* db, const char* sql)
 
 [[nodiscard]] SqliteDbPtr openDb(const std::filesystem::path& path, int flags)
 {
-    if ((flags & SQLITE_OPEN_READONLY) != 0)
+    if ((flags & SQLITE_OPEN_CREATE) == 0)
     {
         std::error_code ec{};
         if (!std::filesystem::exists(path, ec) || ec)
