@@ -5,7 +5,9 @@
 #include "hepatizon/crypto/KdfMetadata.hpp"
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace hepatizon::storage
 {
@@ -26,9 +28,13 @@ public:
     IStorageRepository& operator=(IStorageRepository&&) = delete;
     virtual ~IStorageRepository() = default;
 
+    [[nodiscard]] virtual bool vaultExists(const std::filesystem::path& vaultDir) const = 0;
+
     virtual void createVault(const std::filesystem::path& vaultDir, const VaultInfo& info) = 0;
 
     [[nodiscard]] virtual VaultInfo loadVaultInfo(const std::filesystem::path& vaultDir) const = 0;
+
+    virtual void storeKdfMetadata(const std::filesystem::path& vaultDir, const hepatizon::crypto::KdfMetadata& kdf) = 0;
 
     virtual void storeEncryptedHeader(const std::filesystem::path& vaultDir,
                                       const hepatizon::crypto::AeadBox& encryptedHeader) = 0;
@@ -38,6 +44,11 @@ public:
 
     [[nodiscard]] virtual std::optional<hepatizon::crypto::AeadBox> loadBlob(const std::filesystem::path& vaultDir,
                                                                              std::string_view key) const = 0;
+
+    [[nodiscard]] virtual std::vector<std::string> listBlobKeys(const std::filesystem::path& vaultDir) const = 0;
+
+    // Returns true if a row was deleted, false if it was not found.
+    [[nodiscard]] virtual bool deleteBlob(const std::filesystem::path& vaultDir, std::string_view key) = 0;
 };
 
 } // namespace hepatizon::storage

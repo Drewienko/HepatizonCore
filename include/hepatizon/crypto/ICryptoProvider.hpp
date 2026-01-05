@@ -39,6 +39,13 @@ public:
     [[nodiscard]] virtual hepatizon::security::SecureBuffer
     deriveMasterKey(std::span<const std::byte> password, const hepatizon::crypto::KdfMetadata& meta) const = 0;
 
+    // Derives a deterministic subkey from a master key.
+    // Used for key separation (e.g. header encryption vs blob encryption).
+    // Contract violations may throw std::invalid_argument.
+    [[nodiscard]] virtual hepatizon::security::SecureBuffer deriveSubkey(std::span<const std::uint8_t> masterKey,
+                                                                         std::span<const std::byte> context,
+                                                                         std::size_t outBytes) const = 0;
+
     [[nodiscard]] virtual bool randomBytes(std::span<std::uint8_t> out) noexcept = 0;
 
     // AEAD: ChaCha20-Poly1305 (IETF, 12-byte nonce).

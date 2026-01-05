@@ -67,6 +67,31 @@ public:
         return hepatizon::crypto::deriveMasterKeyArgon2id(password, asBytes(saltBytes), meta.argon2id);
     }
 
+    [[nodiscard]] hepatizon::security::SecureBuffer deriveSubkey(std::span<const std::uint8_t> masterKey,
+                                                                 std::span<const std::byte> context,
+                                                                 std::size_t outBytes) const override
+    {
+        if (masterKey.empty())
+        {
+            throw std::invalid_argument("deriveSubkey: empty masterKey");
+        }
+        if (context.empty())
+        {
+            throw std::invalid_argument("deriveSubkey: empty context");
+        }
+
+        if (size_t constexpr maxOutBytes{ 64U }; outBytes == 0U || outBytes > maxOutBytes)
+        {
+            throw std::invalid_argument("deriveSubkey: invalid outBytes");
+        }
+
+        hepatizon::security::SecureBuffer out{};
+        out.resize(outBytes);
+        crypto_blake2b_keyed(out.data(), out.size(), masterKey.data(), masterKey.size(), asU8(context).data(),
+                             context.size());
+        return out;
+    }
+
     [[nodiscard]] bool randomBytes(std::span<std::uint8_t> out) noexcept override
     {
         return hepatizon::security::secureRandomFill(out);

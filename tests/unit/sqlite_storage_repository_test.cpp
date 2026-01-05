@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <vector>
 
 TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
 {
@@ -67,4 +68,87 @@ TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
     EXPECT_EQ(loaded.encryptedHeader.cipherText, header.cipherText);
 
     std::filesystem::remove_all(dir);
+}
+
+TEST(SqliteStorageRepository, ListAndDeleteBlobs)
+{
+    auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
+    const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_repo_") };
+    ASSERT_FALSE(dir.empty());
+
+    constexpr std::uint32_t kTestMemoryKiB{ 8U };
+    constexpr std::uint8_t kTestSaltByte0{ 0x42U };
+    constexpr std::uint8_t kTestSaltByte1{ 0x99U };
+
+    hepatizon::crypto::KdfMetadata kdf{};
+    kdf.argon2id =
+        hepatizon::crypto::Argon2idParams{ .iterations = 1U, .memoryKiB = kTestMemoryKiB, .parallelism = 1U };
+    kdf.salt[0] = kTestSaltByte0;
+    kdf.salt[1] = kTestSaltByte1;
+
+    hepatizon::crypto::AeadBox box{};
+    box.nonce[0] = 0x01U;
+    box.tag[0] = 0x02U;
+    box.cipherText = std::vector<std::uint8_t>{ 0x03U, 0x04U };
+
+    hepatizon::storage::VaultInfo info{};
+    info.kdf = kdf;
+    info.encryptedHeader = box;
+    repo->createVault(dir, info);
+
+    repo->storeBlob(dir, "k1", box);
+    repo->storeBlob(dir, "k2", box);
+
+    const auto keys{ repo->listBlobKeys(dir) };
+    EXPECT_EQ(keys.size(), 2U);
+
+    EXPECT_TRUE(repo->deleteBlob(dir, "k1"));
+    EXPECT_FALSE(repo->deleteBlob(dir, "k1"));
+
+    const auto keys2{ repo->listBlobKeys(dir) };
+    EXPECT_EQ(keys2.size(), 1U);
+}
+
+TEST(SqliteStorageRepository, VaultExistsChecksForMetaAndDb)
+{
+    auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
+
+    const auto missingDir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_missing_") / "does_not_exist" };
+    EXPECT_FALSE(repo->vaultExists(missingDir));
+
+    const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_exists_") };
+    ASSERT_FALSE(dir.empty());
+    EXPECT_FALSE(repo->vaultExists(dir));
+
+    hepatizon::crypto::KdfMetadata kdf{};
+    kdf.policyVersion = hepatizon::crypto::g_kKdfPolicyVersion;
+    kdf.algorithm = hepatizon::crypto::KdfAlgorithm::Argon2id;
+    kdf.argon2Version = hepatizon::crypto::g_kArgon2VersionV13;
+    kdf.derivedKeyBytes = static_cast<std::uint32_t>(hepatizon::crypto::g_kMasterKeyBytes);
+
+    constexpr std::uint32_t testMemoryKiB{ 8U };
+    kdf.argon2id = hepatizon::crypto::Argon2idParams{ .iterations = 1U, .memoryKiB = testMemoryKiB, .parallelism = 1U };
+    kdf.salt[0] = 0x01U;
+
+    hepatizon::crypto::AeadBox header{};
+    header.cipherText = std::vector<std::uint8_t>{ 0x01U };
+
+    hepatizon::storage::VaultInfo info{};
+    info.kdf = kdf;
+    info.encryptedHeader = header;
+    repo->createVault(dir, info);
+    EXPECT_TRUE(repo->vaultExists(dir));
+
+    constexpr std::string_view kMetaFile{ "vault.meta" };
+    constexpr std::string_view kDbFile{ "vault.db" };
+
+    std::filesystem::remove(dir / std::filesystem::path{ kMetaFile });
+    EXPECT_FALSE(repo->vaultExists(dir));
+
+    const auto dir2{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_exists2_") };
+    ASSERT_FALSE(dir2.empty());
+    repo->createVault(dir2, info);
+    EXPECT_TRUE(repo->vaultExists(dir2));
+    std::filesystem::remove(dir2 / std::filesystem::path{ kDbFile });
+    EXPECT_FALSE(repo->vaultExists(dir2));
 }

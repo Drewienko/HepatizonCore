@@ -166,7 +166,8 @@ namespace detail
     std::filesystem::path base{};
     {
         const std::filesystem::path tmpRoot{ std::filesystem::temp_directory_path() };
-        const std::array<std::filesystem::path, 2> roots{ detail::xdgRuntimeRoot(), tmpRoot };
+        // Prefer the OS temp dir first; some environments expose XDG_RUNTIME_DIR but disallow writes to it.
+        const std::array<std::filesystem::path, 2> roots{ tmpRoot, detail::xdgRuntimeRoot() };
         for (const auto& root : roots)
         {
             if (root.empty())

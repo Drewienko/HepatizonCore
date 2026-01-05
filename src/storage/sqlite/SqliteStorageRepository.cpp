@@ -2,6 +2,7 @@
 
 #include "hepatizon/crypto/ICryptoProvider.hpp"
 #include "hepatizon/storage/IStorageRepository.hpp"
+#include "hepatizon/storage/StorageErrors.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -132,6 +133,12 @@ void writeMetaFile(const std::filesystem::path& path, const hepatizon::crypto::K
 
 [[nodiscard]] hepatizon::crypto::KdfMetadata readMetaFile(const std::filesystem::path& path)
 {
+    std::error_code ec{};
+    if (!std::filesystem::exists(path, ec) || ec)
+    {
+        throw hepatizon::storage::VaultNotFound("storage: vault metadata not found");
+    }
+
     std::ifstream in{ path, std::ios::binary };
     if (!in)
     {
@@ -222,6 +229,15 @@ void exec(sqlite3* db, const char* sql)
 
 [[nodiscard]] SqliteDbPtr openDb(const std::filesystem::path& path, int flags)
 {
+    if ((flags & SQLITE_OPEN_READONLY) != 0)
+    {
+        std::error_code ec{};
+        if (!std::filesystem::exists(path, ec) || ec)
+        {
+            throw hepatizon::storage::VaultNotFound("storage: vault database not found");
+        }
+    }
+
     sqlite3* raw{ nullptr };
     const std::string filename{ path.string() };
     const int rc{ sqlite3_open_v2(filename.c_str(), &raw, flags, nullptr) };
@@ -417,6 +433,65 @@ void upsertBlob(sqlite3* db, std::string_view key, const hepatizon::crypto::Aead
     return readAeadBoxFromRow(stmt.get(), "storage: invalid vault_blobs row");
 }
 
+[[nodiscard]] std::vector<std::string> listBlobKeys(sqlite3* db)
+{
+    const char* sql{ "SELECT key FROM vault_blobs ORDER BY key ASC;" };
+    auto stmt{ prepare(db, sql) };
+
+    std::vector<std::string> keys{};
+    for (;;)
+    {
+        const int stepRc{ sqlite3_step(stmt.get()) };
+        if (stepRc == SQLITE_DONE)
+        {
+            break;
+        }
+        if (stepRc != SQLITE_ROW)
+        {
+            throw std::runtime_error(sqliteErr(db, "storage: select blob keys failed"));
+        }
+
+        const unsigned char* text{ sqlite3_column_text(stmt.get(), 0) };
+        const int bytes{ sqlite3_column_bytes(stmt.get(), 0) };
+        if (text == nullptr || bytes < 0)
+        {
+            throw std::runtime_error("storage: invalid vault_blobs key row");
+        }
+        keys.emplace_back(reinterpret_cast<const char*>(text), static_cast<std::size_t>(bytes));
+    }
+    return keys;
+}
+
+[[nodiscard]] bool deleteBlob(sqlite3* db, std::string_view key)
+{
+    if (key.empty())
+    {
+        throw std::invalid_argument("storage: empty blob key");
+    }
+
+    const char* sql{ "DELETE FROM vault_blobs WHERE key = ?;" };
+    auto stmt{ prepare(db, sql) };
+
+    const int keyBytes{ checkedSqliteBytes(key.size(), "storage: key too large") };
+    if (sqlite3_bind_text(stmt.get(), 1, key.data(), keyBytes, SQLITE_TRANSIENT) != SQLITE_OK)
+    {
+        throw std::runtime_error(sqliteErr(db, "storage: bind key failed"));
+    }
+
+    const int stepRc{ sqlite3_step(stmt.get()) };
+    if (stepRc != SQLITE_DONE)
+    {
+        throw std::runtime_error(sqliteErr(db, "storage: delete blob failed"));
+    }
+
+    const int changes{ sqlite3_changes(db) };
+    if (changes < 0)
+    {
+        throw std::runtime_error("storage: sqlite3_changes failed");
+    }
+    return changes != 0;
+}
+
 [[nodiscard]] hepatizon::crypto::AeadBox loadHeader(sqlite3* db)
 {
     const char* sql{ "SELECT nonce, tag, ciphertext FROM vault_header WHERE id = ?;" };
@@ -472,6 +547,31 @@ void ensureEmptyDirOrCreate(const std::filesystem::path& vaultDir)
 class SqliteStorageRepository final : public hepatizon::storage::IStorageRepository
 {
 public:
+    [[nodiscard]] bool vaultExists(const std::filesystem::path& vaultDir) const override
+    {
+        std::error_code ec{};
+        if (!std::filesystem::exists(vaultDir, ec) || ec)
+        {
+            return false;
+        }
+        if (!std::filesystem::is_directory(vaultDir, ec) || ec)
+        {
+            return false;
+        }
+
+        const auto metaPath{ metaPathFor(vaultDir) };
+        const auto dbPath{ dbPathFor(vaultDir) };
+        if (!std::filesystem::exists(metaPath, ec) || ec)
+        {
+            return false;
+        }
+        if (!std::filesystem::exists(dbPath, ec) || ec)
+        {
+            return false;
+        }
+        return true;
+    }
+
     void createVault(const std::filesystem::path& vaultDir, const hepatizon::storage::VaultInfo& info) override
     {
         ensureEmptyDirOrCreate(vaultDir);
@@ -499,6 +599,20 @@ public:
         return info;
     }
 
+    void storeKdfMetadata(const std::filesystem::path& vaultDir, const hepatizon::crypto::KdfMetadata& kdf) override
+    {
+        const auto metaPath{ metaPathFor(vaultDir) };
+        const auto dbPath{ dbPathFor(vaultDir) };
+
+        std::error_code ec{};
+        if (!std::filesystem::exists(metaPath, ec) || ec || !std::filesystem::exists(dbPath, ec) || ec)
+        {
+            throw hepatizon::storage::VaultNotFound("storage: vault not found");
+        }
+
+        writeMetaFile(metaPath, kdf);
+    }
+
     void storeEncryptedHeader(const std::filesystem::path& vaultDir,
                               const hepatizon::crypto::AeadBox& encryptedHeader) override
     {
@@ -523,6 +637,22 @@ public:
         const auto dbPath{ dbPathFor(vaultDir) };
         auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
         return ::hepatizon::storage::sqlite::loadBlob(db.get(), key);
+    }
+
+    [[nodiscard]] std::vector<std::string> listBlobKeys(const std::filesystem::path& vaultDir) const override
+    {
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
+        ensureSchema(db.get());
+        return ::hepatizon::storage::sqlite::listBlobKeys(db.get());
+    }
+
+    [[nodiscard]] bool deleteBlob(const std::filesystem::path& vaultDir, std::string_view key) override
+    {
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
+        ensureSchema(db.get());
+        return ::hepatizon::storage::sqlite::deleteBlob(db.get(), key);
     }
 };
 

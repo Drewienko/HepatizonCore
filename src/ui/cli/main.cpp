@@ -161,7 +161,7 @@ void runScenario(std::string_view name, hepatizon::crypto::ICryptoProvider& cryp
     auto password{ randomHexPassword() };
     auto wipePassword{ hepatizon::security::scopeWipe(password) };
 
-    auto createRes{ service.createVault(vaultDir, hepatizon::security::asBytes(password)) };
+    auto createRes{ service.createVault(vaultDir, password) };
     if (std::holds_alternative<hepatizon::core::VaultError>(createRes))
     {
         std::cout << "createVault failed\n";
@@ -169,7 +169,7 @@ void runScenario(std::string_view name, hepatizon::crypto::ICryptoProvider& cryp
     }
     std::cout << "vault created at: " << vaultDir.string() << "\n";
 
-    auto unlockRes{ service.unlockVault(vaultDir, hepatizon::security::asBytes(password)) };
+    auto unlockRes{ service.openVault(vaultDir, password) };
     if (std::holds_alternative<hepatizon::core::VaultError>(unlockRes))
     {
         std::cout << "unlockVault failed\n";

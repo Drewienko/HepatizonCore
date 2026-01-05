@@ -8,11 +8,13 @@
 #include "hepatizon/security/SecureString.hpp"
 #include "hepatizon/storage/sqlite/SqliteStorageRepositoryFactory.hpp"
 #include "test_utils/TestUtils.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <gtest/gtest.h>
 #include <span>
+#include <string>
 #include <string_view>
 #include <system_error>
 #include <variant>
@@ -84,7 +86,7 @@ private:
     hepatizon::security::SecureString m_password;
 };
 
-[[nodiscard]] inline bool initScenarioPassword(ScenarioCleanup& cleanup) noexcept
+[[nodiscard]] inline bool initScenarioPassword(ScenarioCleanup& cleanup)
 {
     // Avoid hard-coded passwords in tests: generate a per-run random passphrase.
     constexpr std::size_t kTokenBytes{ 16U };
@@ -124,8 +126,7 @@ makeTempDirOrFail(std::string_view prefix) noexcept
 createVaultOrResult(hepatizon::core::VaultService& service, const std::filesystem::path& dir,
                     hepatizon::security::SecureString& password, bool allowSkipUnsupportedKdf) noexcept
 {
-    const auto createRes{ service.createVault(dir, hepatizon::security::asBytes(password),
-                                              hepatizon::test_utils::argon2idParamsForVaultTests()) };
+    const auto createRes{ service.createVault(dir, password, hepatizon::test_utils::argon2idParamsForVaultTests()) };
     if (std::holds_alternative<hepatizon::core::VaultError>(createRes))
     {
         const auto err{ std::get<hepatizon::core::VaultError>(createRes) };
@@ -143,10 +144,10 @@ createVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
 unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesystem::path& dir,
                     const hepatizon::security::SecureString& password) noexcept
 {
-    auto unlockRes{ service.unlockVault(dir, hepatizon::security::asBytes(password)) };
+    auto unlockRes{ service.openVault(dir, password) };
     if (std::holds_alternative<hepatizon::core::VaultError>(unlockRes))
     {
-        ADD_FAILURE() << "unlockVault failed";
+        ADD_FAILURE() << "openVault failed";
         return ScenarioResult{ ScenarioOutcome::Failed, {} };
     }
     return std::move(std::get<hepatizon::core::UnlockedVault>(unlockRes));
@@ -209,7 +210,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     try
     {
         const auto storedInfo{ storage->loadVaultInfo(cleanup.dir()) };
-        const auto wrongAad{ crypto.aeadDecrypt(unlocked.masterKey(), storedInfo.encryptedHeader, {}) };
+        const auto wrongAad{ crypto.aeadDecrypt(unlocked.headerKey(), storedInfo.encryptedHeader, {}) };
         if (wrongAad.has_value())
         {
             ADD_FAILURE() << "decrypting with wrong AAD unexpectedly succeeded";
@@ -235,7 +236,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    if (unlocked.header().headerVersion != hepatizon::core::g_vaultHeaderVersionV1 ||
+    if (unlocked.header().headerVersion != hepatizon::core::g_vaultHeaderVersionV2 ||
         unlocked.header().vaultId != created.header().vaultId ||
         unlocked.header().createdAtUnixSeconds != created.header().createdAtUnixSeconds ||
         unlocked.header().dbSchemaVersion != hepatizon::core::g_vaultDbSchemaVersionCurrent ||
@@ -245,9 +246,9 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    if (unlocked.masterKey().empty())
+    if (unlocked.secretsKey().empty())
     {
-        ADD_FAILURE() << "master key is empty";
+        ADD_FAILURE() << "secrets key is empty";
         return { ScenarioOutcome::Failed, {} };
     }
 
@@ -262,6 +263,20 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     if (!std::holds_alternative<std::monostate>(putRes))
     {
         ADD_FAILURE() << "putSecret failed";
+        return { ScenarioOutcome::Failed, {} };
+    }
+
+    const auto keysRes{ service.listSecretKeys(cleanup.dir(), unlocked) };
+    if (!std::holds_alternative<std::vector<std::string>>(keysRes))
+    {
+        ADD_FAILURE() << "listSecretKeys failed";
+        return { ScenarioOutcome::Failed, {} };
+    }
+    const auto keys{ std::get<std::vector<std::string>>(keysRes) };
+    const bool hasKey{ std::find(keys.begin(), keys.end(), std::string{ kKey }) != keys.end() };
+    if (!hasKey)
+    {
+        ADD_FAILURE() << "listSecretKeys missing expected key";
         return { ScenarioOutcome::Failed, {} };
     }
 
@@ -291,6 +306,20 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
+    const auto delRes{ service.deleteSecret(cleanup.dir(), unlocked, kKey) };
+    if (!std::holds_alternative<std::monostate>(delRes))
+    {
+        ADD_FAILURE() << "deleteSecret failed";
+        return { ScenarioOutcome::Failed, {} };
+    }
+    const auto afterDelRes{ service.getSecret(cleanup.dir(), unlocked, kKey) };
+    if (!std::holds_alternative<hepatizon::core::VaultError>(afterDelRes) ||
+        std::get<hepatizon::core::VaultError>(afterDelRes) != hepatizon::core::VaultError::NotFound)
+    {
+        ADD_FAILURE() << "deleted key did not return NotFound";
+        return { ScenarioOutcome::Failed, {} };
+    }
+
     // Wrong password should fail authentication (but not crash).
     auto wrongPassword{ cleanup.password() };
     if (wrongPassword.empty())
@@ -300,7 +329,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     }
     wrongPassword[0] = (wrongPassword[0] == '0') ? '1' : '0';
     auto wipeWrongPassword{ hepatizon::security::scopeWipe(wrongPassword) };
-    const auto wrongUnlock{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(wrongPassword)) };
+    const auto wrongUnlock{ service.openVault(cleanup.dir(), wrongPassword) };
     wipeWrongPassword.release();
     hepatizon::security::secureRelease(wrongPassword);
     if (!std::holds_alternative<hepatizon::core::VaultError>(wrongUnlock) ||
@@ -350,9 +379,10 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     auto futureHeader{ unlocked.header() };
     futureHeader.dbSchemaVersion = hepatizon::core::g_vaultDbSchemaVersionCurrent + 1U;
 
-    const auto plain{ hepatizon::core::encodeVaultHeaderV1(futureHeader) };
+    const auto plain{ hepatizon::core::encodeVaultHeaderV2(futureHeader,
+                                                           std::span<const std::uint8_t>{ unlocked.secretsKey() }) };
     const auto aad{ hepatizon::core::encodeVaultHeaderAadV1(unlocked.kdf()) };
-    const auto encrypted{ crypto.aeadEncrypt(unlocked.masterKey(),
+    const auto encrypted{ crypto.aeadEncrypt(unlocked.headerKey(),
                                              std::span<const std::byte>{ plain.data(), plain.size() },
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
@@ -365,7 +395,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    const auto unlockAgain{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(cleanup.password())) };
+    const auto unlockAgain{ service.openVault(cleanup.dir(), cleanup.password()) };
     if (!std::holds_alternative<hepatizon::core::VaultError>(unlockAgain) ||
         std::get<hepatizon::core::VaultError>(unlockAgain) != hepatizon::core::VaultError::MigrationRequired)
     {
@@ -413,9 +443,10 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     auto oldHeader{ unlocked.header() };
     oldHeader.dbSchemaVersion = hepatizon::core::g_vaultDbSchemaVersionV0;
 
-    const auto plain{ hepatizon::core::encodeVaultHeaderV1(oldHeader) };
+    const auto plain{ hepatizon::core::encodeVaultHeaderV2(oldHeader,
+                                                           std::span<const std::uint8_t>{ unlocked.secretsKey() }) };
     const auto aad{ hepatizon::core::encodeVaultHeaderAadV1(unlocked.kdf()) };
-    const auto encrypted{ crypto.aeadEncrypt(unlocked.masterKey(),
+    const auto encrypted{ crypto.aeadEncrypt(unlocked.headerKey(),
                                              std::span<const std::byte>{ plain.data(), plain.size() },
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
@@ -428,10 +459,10 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
         return { ScenarioOutcome::Failed, {} };
     }
 
-    auto unlockAfter{ service.unlockVault(cleanup.dir(), hepatizon::security::asBytes(cleanup.password())) };
+    auto unlockAfter{ service.openVault(cleanup.dir(), cleanup.password()) };
     if (std::holds_alternative<hepatizon::core::VaultError>(unlockAfter))
     {
-        ADD_FAILURE() << "unlockVault failed after migration";
+        ADD_FAILURE() << "openVault failed after migration";
         return { ScenarioOutcome::Failed, {} };
     }
     const auto& unlockedAfter = std::get<hepatizon::core::UnlockedVault>(unlockAfter);

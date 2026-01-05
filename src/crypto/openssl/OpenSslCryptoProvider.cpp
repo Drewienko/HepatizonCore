@@ -84,20 +84,36 @@ void requireArgon2idParamsSafe(const hepatizon::crypto::Argon2idParams& params)
 using EvpKdfPtr = std::unique_ptr<EVP_KDF, decltype(&EVP_KDF_free)>;
 using EvpKdfCtxPtr = std::unique_ptr<EVP_KDF_CTX, decltype(&EVP_KDF_CTX_free)>;
 using EvpCipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+using EvpMacPtr = std::unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)>;
+using EvpMacCtxPtr = std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)>;
 
 EvpKdfPtr fetchArgon2idKdf()
 {
-    if (EVP_KDF* kdf{ EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr) }; kdf != nullptr)
+    if (EVP_KDF * kdf{ EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr) }; kdf != nullptr)
     {
         return EvpKdfPtr{ kdf, &EVP_KDF_free };
     }
     return EvpKdfPtr{ nullptr, &EVP_KDF_free };
 }
 
+EvpMacPtr fetchBlake2bMac()
+{
+    // OpenSSL MAC algorithm names are string-based. Try common variants.
+    constexpr std::array<const char*, 2> kNames{ "BLAKE2BMAC", "BLAKE2B-MAC" };
+    for (const char* name : kNames)
+    {
+        if (EVP_MAC * mac{ EVP_MAC_fetch(nullptr, name, nullptr) }; mac != nullptr)
+        {
+            return EvpMacPtr{ mac, &EVP_MAC_free };
+        }
+    }
+    return EvpMacPtr{ nullptr, &EVP_MAC_free };
+}
+
 class OpenSslCryptoProvider final : public hepatizon::crypto::ICryptoProvider
 {
 public:
-    OpenSslCryptoProvider() : m_argon2idKdf{ fetchArgon2idKdf() }
+    OpenSslCryptoProvider() : m_argon2idKdf{ fetchArgon2idKdf() }, m_blake2bMac{ fetchBlake2bMac() }
     {
     }
 
@@ -153,6 +169,62 @@ public:
         {
             throw std::runtime_error("deriveMasterKey: EVP_KDF_derive failed");
         }
+        return out;
+    }
+
+    [[nodiscard]] hepatizon::security::SecureBuffer deriveSubkey(std::span<const std::uint8_t> masterKey,
+                                                                 std::span<const std::byte> context,
+                                                                 std::size_t outBytes) const override
+    {
+        if (masterKey.empty())
+        {
+            throw std::invalid_argument("deriveSubkey: empty masterKey");
+        }
+        if (context.empty())
+        {
+            throw std::invalid_argument("deriveSubkey: empty context");
+        }
+
+        if (size_t constexpr maxOutBytes{ 64U }; outBytes == 0U || outBytes > maxOutBytes)
+        {
+            throw std::invalid_argument("deriveSubkey: invalid outBytes");
+        }
+        if (!m_blake2bMac)
+        {
+            throw std::runtime_error("deriveSubkey: OpenSSL BLAKE2BMAC not available");
+        }
+
+        EvpMacCtxPtr ctx{ EVP_MAC_CTX_new(m_blake2bMac.get()), &EVP_MAC_CTX_free };
+        if (!ctx)
+        {
+            throw std::runtime_error("deriveSubkey: EVP_MAC_CTX_new failed");
+        }
+
+        std::size_t outSize{ outBytes };
+        OSSL_PARAM params[]{
+            OSSL_PARAM_construct_size_t(OSSL_MAC_PARAM_SIZE, &outSize),
+            OSSL_PARAM_construct_end(),
+        };
+
+        if (EVP_MAC_init(ctx.get(), masterKey.data(), masterKey.size(), params) != 1)
+        {
+            throw std::runtime_error("deriveSubkey: EVP_MAC_init failed");
+        }
+
+        const auto* msg{ reinterpret_cast<const unsigned char*>(context.data()) };
+        if (EVP_MAC_update(ctx.get(), msg, context.size()) != 1)
+        {
+            throw std::runtime_error("deriveSubkey: EVP_MAC_update failed");
+        }
+
+        hepatizon::security::SecureBuffer out{};
+        out.resize(outBytes);
+        std::size_t written{ out.size() };
+        if (EVP_MAC_final(ctx.get(), out.data(), &written, out.size()) != 1 || written != out.size())
+        {
+            throw std::runtime_error("deriveSubkey: EVP_MAC_final failed");
+        }
+
         return out;
     }
 
@@ -303,7 +375,8 @@ public:
         }
 
         std::array<std::uint8_t, hepatizon::crypto::g_aeadTagBytes> tagCopy{ box.tag };
-        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(tagCopy.size()), tagCopy.data()) != 1)
+        if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(tagCopy.size()), tagCopy.data()) !=
+            1)
         {
             throw std::runtime_error("aeadDecrypt: set tag failed");
         }
@@ -333,6 +406,7 @@ public:
 
 private:
     EvpKdfPtr m_argon2idKdf{ nullptr, &EVP_KDF_free };
+    EvpMacPtr m_blake2bMac{ nullptr, &EVP_MAC_free };
 };
 
 } // namespace

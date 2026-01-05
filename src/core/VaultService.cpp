@@ -1,9 +1,9 @@
 #include "hepatizon/core/VaultService.hpp"
-
 #include "hepatizon/core/KdfPolicy.hpp"
 #include "hepatizon/core/VaultHeaderAad.hpp"
 #include "hepatizon/security/SecureBuffer.hpp"
 #include "hepatizon/security/SecureString.hpp"
+#include "hepatizon/storage/StorageErrors.hpp"
 #include <chrono>
 #include <cstring>
 
@@ -11,6 +11,28 @@ namespace hepatizon::core
 {
 namespace
 {
+
+[[nodiscard]] std::span<const std::byte> asBytes(std::string_view s) noexcept
+{
+    return std::as_bytes(std::span<const char>{ s.data(), s.size() });
+}
+
+[[nodiscard]] VaultResult<hepatizon::storage::VaultInfo>
+loadVaultInfoOrError(hepatizon::storage::IStorageRepository& storage, const std::filesystem::path& vaultDir) noexcept
+{
+    try
+    {
+        return storage.loadVaultInfo(vaultDir);
+    }
+    catch (const hepatizon::storage::VaultNotFound&)
+    {
+        return VaultError::NotFound;
+    }
+    catch (...)
+    {
+        return VaultError::StorageError;
+    }
+}
 
 [[nodiscard]] std::uint64_t unixSecondsNow() noexcept
 {
@@ -30,6 +52,168 @@ namespace
     return crypto.randomBytes(out);
 }
 
+struct ParsedHeader final
+{
+    VaultHeader header{};
+    hepatizon::security::SecureBuffer secretsKey;
+    bool shouldStoreHeader{ false };
+};
+
+[[nodiscard]] VaultResult<hepatizon::security::SecureBuffer>
+deriveHeaderKeyOrError(hepatizon::crypto::ICryptoProvider& crypto, std::span<const std::uint8_t> masterKey) noexcept
+{
+    try
+    {
+        constexpr std::string_view kHeaderKeyContext{ "hepatizon.vault.header.aead_key.v1" };
+        return crypto.deriveSubkey(masterKey, asBytes(kHeaderKeyContext), hepatizon::crypto::g_aeadKeyBytes);
+    }
+    catch (...)
+    {
+        return VaultError::UnsupportedKdfMetadata;
+    }
+}
+
+[[nodiscard]] VaultResult<hepatizon::security::SecureBuffer>
+decryptHeaderOrError(hepatizon::crypto::ICryptoProvider& crypto, std::span<const std::uint8_t> headerKey,
+                     const hepatizon::crypto::AeadBox& encryptedHeader,
+                     const hepatizon::crypto::KdfMetadata& kdf) noexcept
+{
+    try
+    {
+        const auto aad{ encodeVaultHeaderAadV1(kdf) };
+        const auto plainOpt{ crypto.aeadDecrypt(headerKey, encryptedHeader,
+                                                std::span<const std::byte>{ aad.data(), aad.size() }) };
+        if (!plainOpt)
+        {
+            return VaultError::AuthFailed;
+        }
+        return *plainOpt;
+    }
+    catch (...)
+    {
+        return VaultError::CryptoError;
+    }
+}
+
+[[nodiscard]] VaultResult<ParsedHeader> parseHeaderAndSecretsKeyOrError(hepatizon::crypto::ICryptoProvider& crypto,
+                                                                        hepatizon::security::SecureBuffer masterKey,
+                                                                        std::span<const std::byte> plainBytes) noexcept
+{
+    ParsedHeader out{};
+
+    if (plainBytes.size() == g_vaultHeaderV2Bytes)
+    {
+        out.secretsKey.resize(g_vaultSecretsKeyBytes);
+        if (!decodeVaultHeaderV2(plainBytes, out.header, std::span<std::uint8_t>{ out.secretsKey }))
+        {
+            hepatizon::security::secureRelease(out.secretsKey);
+            hepatizon::security::secureRelease(masterKey);
+            return VaultError::InvalidVaultFormat;
+        }
+        hepatizon::security::secureRelease(masterKey);
+        return out;
+    }
+
+    if (plainBytes.size() == g_vaultHeaderV1Bytes)
+    {
+        const auto headerOpt{ decodeVaultHeaderV1(plainBytes) };
+        if (!headerOpt)
+        {
+            hepatizon::security::secureRelease(masterKey);
+            return VaultError::InvalidVaultFormat;
+        }
+        out.header = *headerOpt;
+
+        try
+        {
+            constexpr std::string_view kSecretsKeyContext{ "hepatizon.vault.secrets.aead_key.v1" };
+            out.secretsKey =
+                crypto.deriveSubkey(masterKey, asBytes(kSecretsKeyContext), hepatizon::crypto::g_aeadKeyBytes);
+        }
+        catch (...)
+        {
+            hepatizon::security::secureRelease(masterKey);
+            return VaultError::UnsupportedKdfMetadata;
+        }
+        hepatizon::security::secureRelease(masterKey);
+
+        out.header.headerVersion = g_vaultHeaderVersionV2;
+        out.shouldStoreHeader = true;
+        return out;
+    }
+
+    hepatizon::security::secureRelease(masterKey);
+    return VaultError::InvalidVaultFormat;
+}
+
+[[nodiscard]] VaultResult<ParsedHeader> migrateSchemaOrError(ParsedHeader parsed) noexcept
+{
+    if (parsed.header.dbSchemaVersion > g_vaultDbSchemaVersionCurrent)
+    {
+        hepatizon::security::secureRelease(parsed.secretsKey);
+        return VaultError::MigrationRequired;
+    }
+
+    if (parsed.header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
+    {
+        parsed.shouldStoreHeader = true;
+        while (parsed.header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
+        {
+            if (parsed.header.dbSchemaVersion == g_vaultDbSchemaVersionV0 &&
+                g_vaultDbSchemaVersionCurrent == g_vaultDbSchemaVersionV1)
+            {
+                parsed.header.dbSchemaVersion = g_vaultDbSchemaVersionV1;
+                continue;
+            }
+            hepatizon::security::secureRelease(parsed.secretsKey);
+            return VaultError::InvalidVaultFormat;
+        }
+    }
+
+    return parsed;
+}
+
+[[nodiscard]] VaultResult<std::monostate>
+maybeStoreUpdatedHeader(hepatizon::storage::IStorageRepository& storage, hepatizon::crypto::ICryptoProvider& crypto,
+                        const std::filesystem::path& vaultDir, std::span<const std::uint8_t> headerKey,
+                        const hepatizon::crypto::KdfMetadata& kdf, const VaultHeader& header,
+                        std::span<const std::uint8_t> secretsKey, bool shouldStoreHeader) noexcept
+{
+    if (!shouldStoreHeader)
+    {
+        return std::monostate{};
+    }
+    if (secretsKey.size() != g_vaultSecretsKeyBytes)
+    {
+        return VaultError::InvalidVaultFormat;
+    }
+
+    hepatizon::crypto::AeadBox reEncrypted{};
+    try
+    {
+        const auto updatedPlain{ encodeVaultHeaderV2(header, secretsKey) };
+        const auto aad{ encodeVaultHeaderAadV1(kdf) };
+        reEncrypted =
+            crypto.aeadEncrypt(headerKey, std::span<const std::byte>{ updatedPlain.data(), updatedPlain.size() },
+                               std::span<const std::byte>{ aad.data(), aad.size() });
+    }
+    catch (...)
+    {
+        return VaultError::CryptoError;
+    }
+
+    try
+    {
+        storage.storeEncryptedHeader(vaultDir, reEncrypted);
+    }
+    catch (...)
+    {
+        return VaultError::StorageError;
+    }
+
+    return std::monostate{};
+}
+
 } // namespace
 
 VaultService::VaultService(hepatizon::crypto::ICryptoProvider& crypto,
@@ -38,14 +222,31 @@ VaultService::VaultService(hepatizon::crypto::ICryptoProvider& crypto,
 {
 }
 
-[[nodiscard]] VaultResult<CreatedVault> VaultService::createVault(const std::filesystem::path& vaultDir,
-                                                                  std::span<const std::byte> password) noexcept
+[[nodiscard]] bool VaultService::vaultExists(const std::filesystem::path& vaultDir) const noexcept
+{
+    if (m_storage == nullptr)
+    {
+        return false;
+    }
+    try
+    {
+        return m_storage->vaultExists(vaultDir);
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+[[nodiscard]] VaultResult<CreatedVault>
+VaultService::createVault(const std::filesystem::path& vaultDir,
+                          const hepatizon::security::SecureString& password) noexcept
 {
     return createVault(vaultDir, password, hepatizon::core::defaultArgon2idParams());
 }
 
 [[nodiscard]] VaultResult<CreatedVault>
-VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const std::byte> password,
+VaultService::createVault(const std::filesystem::path& vaultDir, const hepatizon::security::SecureString& password,
                           const hepatizon::crypto::Argon2idParams& params) noexcept
 {
     if (m_crypto == nullptr || m_storage == nullptr)
@@ -63,33 +264,58 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
     hepatizon::security::SecureBuffer masterKey{};
     try
     {
-        masterKey = m_crypto->deriveMasterKey(password, meta);
+        masterKey = m_crypto->deriveMasterKey(hepatizon::security::asBytes(password), meta);
     }
     catch (...)
     {
         return VaultError::UnsupportedKdfMetadata;
     }
 
-    VaultHeaderV1 header{};
-    header.headerVersion = g_vaultHeaderVersionV1;
+    hepatizon::security::SecureBuffer headerKey{};
+    try
+    {
+        constexpr std::string_view kHeaderKeyContext{ "hepatizon.vault.header.aead_key.v1" };
+        headerKey = m_crypto->deriveSubkey(masterKey, asBytes(kHeaderKeyContext), hepatizon::crypto::g_aeadKeyBytes);
+    }
+    catch (...)
+    {
+        hepatizon::security::secureRelease(masterKey);
+        return VaultError::UnsupportedKdfMetadata;
+    }
+    hepatizon::security::secureRelease(masterKey);
+
+    VaultHeader header{};
+    header.headerVersion = g_vaultHeaderVersionV2;
     header.createdAtUnixSeconds = unixSecondsNow();
     header.dbSchemaVersion = g_vaultDbSchemaVersionCurrent;
     header.flags = 0U;
     if (!fillRandom(*m_crypto, std::span<std::uint8_t>{ header.vaultId }))
     {
+        hepatizon::security::secureRelease(headerKey);
         return VaultError::RandomFailed;
     }
 
-    const auto plain{ encodeVaultHeaderV1(header) };
+    hepatizon::security::SecureBuffer secretsKey{};
+    secretsKey.resize(g_vaultSecretsKeyBytes);
+    if (!fillRandom(*m_crypto, std::span<std::uint8_t>{ secretsKey }))
+    {
+        hepatizon::security::secureRelease(secretsKey);
+        hepatizon::security::secureRelease(headerKey);
+        return VaultError::RandomFailed;
+    }
+
+    const auto plain{ encodeVaultHeaderV2(header, std::span<const std::uint8_t>{ secretsKey }) };
     const auto aad{ encodeVaultHeaderAadV1(meta) };
     hepatizon::crypto::AeadBox encrypted{};
     try
     {
-        encrypted = m_crypto->aeadEncrypt(masterKey, std::span<const std::byte>{ plain.data(), plain.size() },
+        encrypted = m_crypto->aeadEncrypt(headerKey, std::span<const std::byte>{ plain.data(), plain.size() },
                                           std::span<const std::byte>{ aad.data(), aad.size() });
     }
     catch (...)
     {
+        hepatizon::security::secureRelease(secretsKey);
+        hepatizon::security::secureRelease(headerKey);
         return VaultError::CryptoError;
     }
 
@@ -103,107 +329,185 @@ VaultService::createVault(const std::filesystem::path& vaultDir, std::span<const
     }
     catch (...)
     {
+        hepatizon::security::secureRelease(secretsKey);
+        hepatizon::security::secureRelease(headerKey);
         return VaultError::StorageError;
     }
 
+    hepatizon::security::secureRelease(secretsKey);
+    hepatizon::security::secureRelease(headerKey);
     return CreatedVault{ meta, header };
 }
 
-[[nodiscard]] VaultResult<UnlockedVault> VaultService::unlockVault(const std::filesystem::path& vaultDir,
-                                                                   std::span<const std::byte> password)
+[[nodiscard]] VaultResult<UnlockedVault>
+VaultService::openVault(const std::filesystem::path& vaultDir,
+                        const hepatizon::security::SecureString& password) noexcept
 {
     if (m_crypto == nullptr || m_storage == nullptr)
     {
         return VaultError::CryptoError;
     }
 
-    hepatizon::storage::VaultInfo info{};
-    try
+    const auto infoOrErr{ loadVaultInfoOrError(*m_storage, vaultDir) };
+    if (std::holds_alternative<VaultError>(infoOrErr))
     {
-        info = m_storage->loadVaultInfo(vaultDir);
+        return std::get<VaultError>(infoOrErr);
     }
-    catch (...)
-    {
-        return VaultError::StorageError;
-    }
+    const auto info{ std::get<hepatizon::storage::VaultInfo>(infoOrErr) };
 
     hepatizon::security::SecureBuffer masterKey{};
     try
     {
-        masterKey = m_crypto->deriveMasterKey(password, info.kdf);
+        masterKey = m_crypto->deriveMasterKey(hepatizon::security::asBytes(password), info.kdf);
     }
     catch (...)
     {
         return VaultError::UnsupportedKdfMetadata;
     }
 
-    std::optional<hepatizon::security::SecureBuffer> plainOpt{};
-    try
+    const auto headerKeyOrErr{ deriveHeaderKeyOrError(*m_crypto, masterKey) };
+    if (std::holds_alternative<VaultError>(headerKeyOrErr))
     {
-        const auto aad{ encodeVaultHeaderAadV1(info.kdf) };
-        plainOpt = m_crypto->aeadDecrypt(masterKey, info.encryptedHeader,
-                                         std::span<const std::byte>{ aad.data(), aad.size() });
+        hepatizon::security::secureRelease(masterKey);
+        return std::get<VaultError>(headerKeyOrErr);
     }
-    catch (...)
+    auto headerKey{ std::get<hepatizon::security::SecureBuffer>(headerKeyOrErr) };
+
+    const auto plainOrErr{ decryptHeaderOrError(*m_crypto, headerKey, info.encryptedHeader, info.kdf) };
+    if (std::holds_alternative<VaultError>(plainOrErr))
+    {
+        hepatizon::security::secureRelease(masterKey);
+        hepatizon::security::secureRelease(headerKey);
+        return std::get<VaultError>(plainOrErr);
+    }
+    auto plain{ std::get<hepatizon::security::SecureBuffer>(plainOrErr) };
+    const auto parsedOrErr{ parseHeaderAndSecretsKeyOrError(*m_crypto, std::move(masterKey),
+                                                            hepatizon::security::asBytes(plain)) };
+    hepatizon::security::secureRelease(plain);
+    if (std::holds_alternative<VaultError>(parsedOrErr))
+    {
+        hepatizon::security::secureRelease(headerKey);
+        return std::get<VaultError>(parsedOrErr);
+    }
+    auto parsed{ std::get<ParsedHeader>(parsedOrErr) };
+
+    const auto migratedOrErr{ migrateSchemaOrError(std::move(parsed)) };
+    if (std::holds_alternative<VaultError>(migratedOrErr))
+    {
+        hepatizon::security::secureRelease(headerKey);
+        return std::get<VaultError>(migratedOrErr);
+    }
+    parsed = std::get<ParsedHeader>(migratedOrErr);
+
+    const auto storedOrErr{ maybeStoreUpdatedHeader(*m_storage, *m_crypto, vaultDir, headerKey, info.kdf, parsed.header,
+                                                    parsed.secretsKey, parsed.shouldStoreHeader) };
+    if (std::holds_alternative<VaultError>(storedOrErr))
+    {
+        hepatizon::security::secureRelease(headerKey);
+        hepatizon::security::secureRelease(parsed.secretsKey);
+        return std::get<VaultError>(storedOrErr);
+    }
+
+    return UnlockedVault{ info.kdf, parsed.header, std::move(headerKey), std::move(parsed.secretsKey) };
+}
+
+[[nodiscard]] VaultResult<UnlockedVault>
+VaultService::rekeyVault(const std::filesystem::path& vaultDir, UnlockedVault&& v,
+                         const hepatizon::security::SecureString& newPassword) noexcept
+{
+    return rekeyVault(vaultDir, std::move(v), newPassword, hepatizon::core::defaultArgon2idParams());
+}
+
+[[nodiscard]] VaultResult<UnlockedVault>
+VaultService::rekeyVault(const std::filesystem::path& vaultDir, UnlockedVault&& v,
+                         const hepatizon::security::SecureString& newPassword,
+                         const hepatizon::crypto::Argon2idParams& params) noexcept
+{
+    if (m_crypto == nullptr || m_storage == nullptr)
     {
         return VaultError::CryptoError;
     }
 
-    if (!plainOpt)
+    const auto newMetaOpt{ hepatizon::core::makeKdfMetadata(params) };
+    if (!newMetaOpt)
     {
-        return VaultError::AuthFailed;
+        return VaultError::RandomFailed;
+    }
+    const auto newMeta{ *newMetaOpt };
+
+    hepatizon::security::SecureBuffer newMasterKey{};
+    try
+    {
+        newMasterKey = m_crypto->deriveMasterKey(hepatizon::security::asBytes(newPassword), newMeta);
+    }
+    catch (...)
+    {
+        return VaultError::UnsupportedKdfMetadata;
     }
 
-    const auto headerOpt{ decodeVaultHeaderV1(hepatizon::security::asBytes(*plainOpt)) };
-    if (!headerOpt)
+    hepatizon::security::SecureBuffer newHeaderKey{};
+    try
     {
+        constexpr std::string_view kHeaderKeyContext{ "hepatizon.vault.header.aead_key.v1" };
+        newHeaderKey =
+            m_crypto->deriveSubkey(newMasterKey, asBytes(kHeaderKeyContext), hepatizon::crypto::g_aeadKeyBytes);
+    }
+    catch (...)
+    {
+        hepatizon::security::secureRelease(newMasterKey);
+        return VaultError::UnsupportedKdfMetadata;
+    }
+    hepatizon::security::secureRelease(newMasterKey);
+
+    auto header{ v.header() };
+    header.headerVersion = g_vaultHeaderVersionV2;
+
+    if (v.secretsKey().size() != g_vaultSecretsKeyBytes)
+    {
+        hepatizon::security::secureRelease(newHeaderKey);
         return VaultError::InvalidVaultFormat;
     }
 
-    if (headerOpt->dbSchemaVersion > g_vaultDbSchemaVersionCurrent)
+    hepatizon::crypto::AeadBox encrypted{};
+    try
     {
-        return VaultError::MigrationRequired;
+        const auto plain{ encodeVaultHeaderV2(header, std::span<const std::uint8_t>{ v.secretsKey() }) };
+        const auto aad{ encodeVaultHeaderAadV1(newMeta) };
+        encrypted = m_crypto->aeadEncrypt(newHeaderKey, std::span<const std::byte>{ plain.data(), plain.size() },
+                                          std::span<const std::byte>{ aad.data(), aad.size() });
+    }
+    catch (...)
+    {
+        hepatizon::security::secureRelease(newHeaderKey);
+        return VaultError::CryptoError;
     }
 
-    auto header{ *headerOpt };
-    if (header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
+    try
     {
-        while (header.dbSchemaVersion < g_vaultDbSchemaVersionCurrent)
-        {
-            if (header.dbSchemaVersion == g_vaultDbSchemaVersionV0 &&
-                g_vaultDbSchemaVersionCurrent == g_vaultDbSchemaVersionV1)
-            {
-                header.dbSchemaVersion = g_vaultDbSchemaVersionV1;
-                continue;
-            }
-            return VaultError::InvalidVaultFormat;
-        }
-
-        hepatizon::crypto::AeadBox reEncrypted{};
+        m_storage->storeKdfMetadata(vaultDir, newMeta);
+        m_storage->storeEncryptedHeader(vaultDir, encrypted);
+    }
+    catch (const hepatizon::storage::VaultNotFound&)
+    {
+        hepatizon::security::secureRelease(newHeaderKey);
+        return VaultError::NotFound;
+    }
+    catch (...)
+    {
+        // Best-effort rollback: restore old metadata if we already wrote the new one.
         try
         {
-            const auto updatedPlain{ encodeVaultHeaderV1(header) };
-            const auto aad{ encodeVaultHeaderAadV1(info.kdf) };
-            reEncrypted =
-                m_crypto->aeadEncrypt(masterKey, std::span<const std::byte>{ updatedPlain.data(), updatedPlain.size() },
-                                      std::span<const std::byte>{ aad.data(), aad.size() });
+            m_storage->storeKdfMetadata(vaultDir, v.kdf());
         }
         catch (...)
         {
-            return VaultError::CryptoError;
         }
-
-        try
-        {
-            m_storage->storeEncryptedHeader(vaultDir, reEncrypted);
-        }
-        catch (...)
-        {
-            return VaultError::StorageError;
-        }
+        hepatizon::security::secureRelease(newHeaderKey);
+        return VaultError::StorageError;
     }
 
-    return UnlockedVault{ info.kdf, header, std::move(masterKey) };
+    auto secretsKey{ v.takeSecretsKey() };
+    return UnlockedVault{ newMeta, header, std::move(newHeaderKey), std::move(secretsKey) };
 }
 
 [[nodiscard]] VaultResult<std::monostate>
@@ -225,7 +529,7 @@ VaultService::putSecret(const std::filesystem::path& vaultDir, const UnlockedVau
     hepatizon::crypto::AeadBox encrypted{};
     try
     {
-        encrypted = m_crypto->aeadEncrypt(v.masterKey(), hepatizon::security::asBytes(value), aad);
+        encrypted = m_crypto->aeadEncrypt(v.secretsKey(), hepatizon::security::asBytes(value), aad);
     }
     catch (...)
     {
@@ -245,7 +549,7 @@ VaultService::putSecret(const std::filesystem::path& vaultDir, const UnlockedVau
 }
 
 [[nodiscard]] VaultResult<hepatizon::security::SecureString>
-VaultService::getSecret(const std::filesystem::path& vaultDir, const UnlockedVault& v, std::string_view key) noexcept
+VaultService::getSecret(const std::filesystem::path& vaultDir, const UnlockedVault& v, std::string_view key)
 {
     if (m_crypto == nullptr || m_storage == nullptr)
     {
@@ -276,7 +580,7 @@ VaultService::getSecret(const std::filesystem::path& vaultDir, const UnlockedVau
     std::optional<hepatizon::security::SecureBuffer> plainOpt{};
     try
     {
-        plainOpt = m_crypto->aeadDecrypt(v.masterKey(), *boxOpt, aad);
+        plainOpt = m_crypto->aeadDecrypt(v.secretsKey(), *boxOpt, aad);
     }
     catch (...)
     {
@@ -295,6 +599,60 @@ VaultService::getSecret(const std::filesystem::path& vaultDir, const UnlockedVau
     }
     hepatizon::security::secureRelease(*plainOpt);
     return out;
+}
+
+[[nodiscard]] VaultResult<std::vector<std::string>> VaultService::listSecretKeys(const std::filesystem::path& vaultDir,
+                                                                                 const UnlockedVault& v) noexcept
+{
+    (void)v;
+    if (m_storage == nullptr)
+    {
+        return VaultError::StorageError;
+    }
+
+    try
+    {
+        return m_storage->listBlobKeys(vaultDir);
+    }
+    catch (const hepatizon::storage::VaultNotFound&)
+    {
+        return VaultError::NotFound;
+    }
+    catch (...)
+    {
+        return VaultError::StorageError;
+    }
+}
+
+[[nodiscard]] VaultResult<std::monostate>
+VaultService::deleteSecret(const std::filesystem::path& vaultDir, const UnlockedVault& v, std::string_view key) noexcept
+{
+    (void)v;
+    if (m_storage == nullptr)
+    {
+        return VaultError::StorageError;
+    }
+    if (key.empty())
+    {
+        return VaultError::InvalidVaultFormat;
+    }
+
+    try
+    {
+        if (!m_storage->deleteBlob(vaultDir, key))
+        {
+            return VaultError::NotFound;
+        }
+        return std::monostate{};
+    }
+    catch (const hepatizon::storage::VaultNotFound&)
+    {
+        return VaultError::NotFound;
+    }
+    catch (...)
+    {
+        return VaultError::StorageError;
+    }
 }
 
 } // namespace hepatizon::core
