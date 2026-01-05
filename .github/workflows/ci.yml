@@ -83,11 +83,10 @@ jobs:
     name: SonarCloud (Linux coverage)
     runs-on: ubuntu-latest
     if: >
-      (secrets.SONAR_TOKEN != '') &&
-      (
-        (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
-        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-      )
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -95,17 +94,24 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Skip SonarCloud (missing SONAR_TOKEN)
+        if: env.SONAR_TOKEN == ''
+        run: echo "SONAR_TOKEN is not set for this repository; skipping SonarCloud analysis."
+
       - name: Setup CMake
+        if: env.SONAR_TOKEN != ''
         uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
         with:
           cmake-version: "3.31.10"
 
       - name: Install system tools
+        if: env.SONAR_TOKEN != ''
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build pkg-config gcovr
 
       - name: Configure (coverage)
+        if: env.SONAR_TOKEN != ''
         run: >
           cmake -S . -B out/build/linux-coverage-gcc -G Ninja
           -DCMAKE_BUILD_TYPE=Debug
@@ -123,12 +129,15 @@ jobs:
           -DCMAKE_SHARED_LINKER_FLAGS=--coverage
 
       - name: Build (coverage)
+        if: env.SONAR_TOKEN != ''
         run: cmake --build out/build/linux-coverage-gcc
 
       - name: Test (coverage)
+        if: env.SONAR_TOKEN != ''
         run: ctest --test-dir out/build/linux-coverage-gcc --output-on-failure
 
       - name: Generate coverage report (gcovr -> SonarQube XML)
+        if: env.SONAR_TOKEN != ''
         run: |
           cd out/build/linux-coverage-gcc
           gcovr -r ../.. --sonarqube coverage.xml \
@@ -138,9 +147,10 @@ jobs:
             --exclude '../../tests/'
 
       - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: >
