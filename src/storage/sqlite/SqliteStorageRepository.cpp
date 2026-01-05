@@ -605,7 +605,7 @@ public:
         const auto dbPath{ dbPathFor(vaultDir) };
 
         std::error_code ec{};
-        if (!std::filesystem::exists(metaPath, ec) || ec || !std::filesystem::exists(dbPath, ec) || ec)
+        if (ec || !std::filesystem::exists(metaPath, ec) || !std::filesystem::exists(dbPath, ec))
         {
             throw hepatizon::storage::VaultNotFound("storage: vault not found");
         }

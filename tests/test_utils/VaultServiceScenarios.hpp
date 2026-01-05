@@ -174,7 +174,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
 
 [[nodiscard]] inline ScenarioResult runVaultServiceCreateUnlockAndSecrets(hepatizon::crypto::ICryptoProvider& crypto,
                                                                           std::string_view tempPrefix,
-                                                                          bool allowSkipUnsupportedKdf) noexcept
+                                                                          bool allowSkipUnsupportedKdf)
 {
     auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))
@@ -344,7 +344,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
 
 [[nodiscard]] inline ScenarioResult runVaultServiceRejectsFutureSchema(hepatizon::crypto::ICryptoProvider& crypto,
                                                                        std::string_view tempPrefix,
-                                                                       bool allowSkipUnsupportedKdf) noexcept
+                                                                       bool allowSkipUnsupportedKdf)
 {
     auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))
@@ -408,7 +408,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
 
 [[nodiscard]] inline ScenarioResult runVaultServiceMigratesOldSchema(hepatizon::crypto::ICryptoProvider& crypto,
                                                                      std::string_view tempPrefix,
-                                                                     bool allowSkipUnsupportedKdf) noexcept
+                                                                     bool allowSkipUnsupportedKdf)
 {
     auto dirOrErr{ detail::makeTempDirOrFail(tempPrefix) };
     if (std::holds_alternative<ScenarioResult>(dirOrErr))

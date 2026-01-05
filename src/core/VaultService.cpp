@@ -55,7 +55,7 @@ loadVaultInfoOrError(hepatizon::storage::IStorageRepository& storage, const std:
 struct ParsedHeader final
 {
     VaultHeader header{};
-    hepatizon::security::SecureBuffer secretsKey;
+    hepatizon::security::SecureBuffer secretsKey{};
     bool shouldStoreHeader{ false };
 };
 
@@ -97,7 +97,7 @@ decryptHeaderOrError(hepatizon::crypto::ICryptoProvider& crypto, std::span<const
 
 [[nodiscard]] VaultResult<ParsedHeader> parseHeaderAndSecretsKeyOrError(hepatizon::crypto::ICryptoProvider& crypto,
                                                                         hepatizon::security::SecureBuffer masterKey,
-                                                                        std::span<const std::byte> plainBytes) noexcept
+                                                                        std::span<const std::byte> plainBytes)
 {
     ParsedHeader out{};
 
@@ -245,9 +245,9 @@ VaultService::createVault(const std::filesystem::path& vaultDir,
     return createVault(vaultDir, password, hepatizon::core::defaultArgon2idParams());
 }
 
-[[nodiscard]] VaultResult<CreatedVault>
-VaultService::createVault(const std::filesystem::path& vaultDir, const hepatizon::security::SecureString& password,
-                          const hepatizon::crypto::Argon2idParams& params) noexcept
+[[nodiscard]] VaultResult<CreatedVault> VaultService::createVault(const std::filesystem::path& vaultDir,
+                                                                  const hepatizon::security::SecureString& password,
+                                                                  const hepatizon::crypto::Argon2idParams& params)
 {
     if (m_crypto == nullptr || m_storage == nullptr)
     {

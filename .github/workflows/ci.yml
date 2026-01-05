@@ -78,3 +78,74 @@ jobs:
 
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
+
+  sonarcloud:
+    name: SonarCloud (Linux coverage)
+    runs-on: ubuntu-latest
+    if: >
+      (secrets.SONAR_TOKEN != '') &&
+      (
+        (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      )
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
+        with:
+          cmake-version: "3.31.10"
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config gcovr
+
+      - name: Configure (coverage)
+        run: >
+          cmake -S . -B out/build/linux-coverage-gcc -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DHEPC_ENABLE_TESTS=ON
+          -DHEPC_ENABLE_OPENSSL=OFF
+          -DHEPC_ENABLE_SANITIZERS=OFF
+          -DHEPC_ENABLE_WARNINGS_AS_ERRORS=ON
+          -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_C_FLAGS=--coverage
+          -DCMAKE_CXX_FLAGS=--coverage
+          -DCMAKE_EXE_LINKER_FLAGS=--coverage
+          -DCMAKE_SHARED_LINKER_FLAGS=--coverage
+
+      - name: Build (coverage)
+        run: cmake --build out/build/linux-coverage-gcc
+
+      - name: Test (coverage)
+        run: ctest --test-dir out/build/linux-coverage-gcc --output-on-failure
+
+      - name: Generate coverage report (gcovr -> SonarQube XML)
+        run: |
+          cd out/build/linux-coverage-gcc
+          gcovr -r ../.. --sonarqube coverage.xml \
+            --exclude '../../third_party/' \
+            --exclude '../../vcpkg/' \
+            --exclude '../../out/' \
+            --exclude '../../tests/'
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >
+            "-Dsonar.host.url=https://sonarcloud.io"
+            "-Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}"
+            "-Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}"
+            "-Dsonar.coverageReportPaths=out/build/linux-coverage-gcc/coverage.xml"
+            "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**"

@@ -3,6 +3,7 @@
 
 #include "hepatizon/core/VaultHeader.hpp"
 #include "hepatizon/crypto/ICryptoProvider.hpp"
+#include "hepatizon/security/SecureBuffer.hpp"
 #include "hepatizon/security/SecureString.hpp"
 #include "hepatizon/storage/IStorageRepository.hpp"
 #include <cstdint>
@@ -57,8 +58,35 @@ public:
     UnlockedVault() = default;
     UnlockedVault(const UnlockedVault&) = delete;
     UnlockedVault& operator=(const UnlockedVault&) = delete;
-    UnlockedVault(UnlockedVault&&) noexcept = default;
-    UnlockedVault& operator=(UnlockedVault&&) noexcept = default;
+    UnlockedVault(UnlockedVault&& other) noexcept
+        : m_kdf(other.m_kdf), m_header(other.m_header), m_headerKey{}, m_secretsKey{}
+    {
+        m_headerKey.swap(other.m_headerKey);
+        m_secretsKey.swap(other.m_secretsKey);
+        other.m_kdf = {};
+        other.m_header = {};
+    }
+
+    UnlockedVault& operator=(UnlockedVault&& other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        m_kdf = other.m_kdf;
+        m_header = other.m_header;
+
+        hepatizon::security::secureRelease(m_headerKey);
+        hepatizon::security::secureRelease(m_secretsKey);
+        m_headerKey.swap(other.m_headerKey);
+        m_secretsKey.swap(other.m_secretsKey);
+
+        other.m_kdf = {};
+        other.m_header = {};
+        return *this;
+    }
+
     ~UnlockedVault() noexcept
     {
         hepatizon::security::secureRelease(m_headerKey);
@@ -115,7 +143,7 @@ public:
 
     [[nodiscard]] VaultResult<CreatedVault> createVault(const std::filesystem::path& vaultDir,
                                                         const hepatizon::security::SecureString& password,
-                                                        const hepatizon::crypto::Argon2idParams& params) noexcept;
+                                                        const hepatizon::crypto::Argon2idParams& params);
 
     // Opens an existing vault: derives keys, decrypts the header, and auto-migrates supported older schemas.
     [[nodiscard]] VaultResult<UnlockedVault> openVault(const std::filesystem::path& vaultDir,
@@ -141,8 +169,8 @@ public:
                                                                        const UnlockedVault& v) noexcept;
 
     // Deletes a secret value. Returns NotFound if key does not exist.
-    [[nodiscard]] VaultResult<std::monostate> deleteSecret(const std::filesystem::path& vaultDir, const UnlockedVault& v,
-                                                           std::string_view key) noexcept;
+    [[nodiscard]] VaultResult<std::monostate> deleteSecret(const std::filesystem::path& vaultDir,
+                                                           const UnlockedVault& v, std::string_view key) noexcept;
 
 private:
     hepatizon::crypto::ICryptoProvider* m_crypto{ nullptr };
