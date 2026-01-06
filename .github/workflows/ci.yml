@@ -119,7 +119,7 @@ jobs:
           -DHEPC_ENABLE_OPENSSL=OFF
           -DHEPC_ENABLE_SANITIZERS=OFF
           -DHEPC_ENABLE_WARNINGS_AS_ERRORS=ON
-          -DHEPC_BUILD_CLI=OFF
+          -DHEPC_BUILD_CLI=ON
           -DHEPC_BUILD_GUI=OFF
           -DCMAKE_C_COMPILER=gcc
           -DCMAKE_CXX_COMPILER=g++
@@ -140,15 +140,15 @@ jobs:
 
       - name: Generate coverage report (gcovr -> SonarQube XML)
         if: env.SONAR_TOKEN != ''
-        run: |
-          gcovr -r . --sonarqube out/build/linux-coverage-gcc/coverage.xml \
-            --object-directory out/build/linux-coverage-gcc \
-            --gcov-ignore-errors=no_working_dir_found \
-            --exclude 'third_party/' \
-            --exclude 'vcpkg/' \
-            --exclude 'out/' \
-            --exclude 'src/ui/' \
-            --exclude 'tests/'
+        run: >
+          gcovr -r . --sonarqube out/build/linux-coverage-gcc/coverage.xml
+          --object-directory out/build/linux-coverage-gcc
+          --gcov-ignore-errors=all
+          --exclude 'third_party/'
+          --exclude 'vcpkg/'
+          --exclude 'out/'
+          --exclude 'tests/'
+          --exclude 'src/ui/cli/main.cpp'
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN != ''
@@ -165,5 +165,5 @@ jobs:
             "-Dsonar.tests=tests"
             "-Dsonar.cfamily.compile-commands=out/build/linux-coverage-gcc/compile_commands.json"
             "-Dsonar.coverageReportPaths=out/build/linux-coverage-gcc/coverage.xml"
-            "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**,src/ui/**"
+            "-Dsonar.exclusions=third_party/**,vcpkg/**,out/**"
             "-Dsonar.cpd.exclusions=tests/**"

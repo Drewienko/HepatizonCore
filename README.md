@@ -2,7 +2,7 @@
 
 HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a temporary debug CLI harness and an optional Qt 6 GUI stub.
 
-> Status (2026-01-05): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/open/rekey + encrypted secret blobs. Rekey does not re-encrypt stored blobs (the vault uses a random secrets key stored inside the encrypted header). Auto-migration exists only for the vault header schema (v1 -> v2). What’s missing: the final vault DB schema + real DB migrations, and real CLI/GUI features.
+> Status (2026-01-06): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/open/rekey + encrypted secret blobs. Rekey does not re-encrypt stored blobs (the vault uses a random secrets key stored inside the encrypted header). Auto-migration exists only for the vault header schema (v1 -> v2). CLI is now an interactive shell (CLI11-based) with tokenization and secure password reading.
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
@@ -14,9 +14,9 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 ---
 
 ## Key capabilities
-- UI: CLI/GUI are currently stubs (GUI behind build flag).
-- Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`).
-- Crypto port: `ICryptoProvider` (KDF + AEAD), with a Native provider (Monocypher-backed) and an optional OpenSSL provider (`HEPC_ENABLE_OPENSSL`).
+- UI: Interactive CLI shell (tokenization, quoting, history-ready) + Qt GUI stub.
+- Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`), memory locking (`mlockall` on Linux).
+- Crypto port: `ICryptoProvider` (KDF + AEAD + Subkey derivation), with a Native provider (Monocypher-backed) and an optional OpenSSL provider (`HEPC_ENABLE_OPENSSL`).
 - KDF: Argon2id with versioned, persisted metadata (`KdfMetadata`) + core-owned defaults (`KdfPolicy`). Native/OpenSSL KDF parity test is best-effort (skips if the OpenSSL Argon2id KDF is unavailable at runtime).
 - Core vault API: `VaultService` (create/open/rekey) and a minimal encrypted blob API (`putSecret`/`getSecret`/`listSecretKeys`/`deleteSecret`).
 - Storage (WIP): `IStorageRepository` + a minimal SQLite adapter storing a plaintext KDF metadata file (`vault.meta`) and an encrypted header row in `vault.db` (payload encryption is via `ICryptoProvider`).
@@ -145,7 +145,7 @@ Build:
 - Windows MSVC: `cmake --build --preset windows-release-msvc --config Release`
 
 Run:
-- CLI: temporary debug harness (stdout-based); real CLI planned (CLI11)
+- CLI: `out/build/<preset>/src/ui/hepc` (Interactive shell)
 - GUI (stub): `out/build/<preset>/src/ui/hepatizoncore_gui`
 
 ---

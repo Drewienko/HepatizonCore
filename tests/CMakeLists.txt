@@ -16,10 +16,14 @@ if(GTest_FOUND)
         unit/sqlite_storage_repository_test.cpp
         unit/vault_service_error_test.cpp
         unit/vault_service_native_integration_test.cpp
+        unit/tokenizer_test.cpp
+        unit/console_utils_test.cpp
     )
+
     target_include_directories(hepatizoncore_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
+
     target_link_libraries(hepatizoncore_tests PRIVATE
         GTest::gtest
         GTest::gtest_main
@@ -30,8 +34,28 @@ if(GTest_FOUND)
         hepatizon_crypto_native
         hepatizon_storage_sqlite
     )
+
     hepc_set_common_warnings(hepatizoncore_tests)
     add_test(NAME hepatizoncore_tests COMMAND hepatizoncore_tests)
+
+    if(HEPC_BUILD_CLI)
+        find_package(CLI11 CONFIG REQUIRED)
+        
+        target_sources(hepatizoncore_tests PRIVATE
+            unit/interactive_shell_test.cpp
+            ../src/ui/cli/InteractiveShell.cpp
+            ../src/ui/cli/Tokenizer.cpp
+            ../src/ui/cli/ConsoleUtils.cpp
+        )
+
+        target_include_directories(hepatizoncore_tests PRIVATE
+            ../src/ui/cli
+        )
+
+        target_link_libraries(hepatizoncore_tests PRIVATE
+            CLI11::CLI11
+        )
+    endif()
 
     if(HEPC_ENABLE_OPENSSL)
         target_sources(hepatizoncore_tests PRIVATE
@@ -41,6 +65,7 @@ if(GTest_FOUND)
         target_link_libraries(hepatizoncore_tests PRIVATE
             hepatizon_crypto_openssl
         )
+        target_compile_definitions(hepatizoncore_tests PRIVATE HEPC_ENABLE_OPENSSL=1)
     endif()
 else()
     message(STATUS "GTest not found; skipping tests target.")

@@ -5,6 +5,7 @@
     "openssl",
     "gtest",
     "sqlite3",
+    "cli11",
     {
       "name": "sqlcipher",
       "platform": "windows"
