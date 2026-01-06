@@ -92,7 +92,7 @@ vcpkg_installed/
 *.user
 
 .cache/
-
+coverage-report/
 # Personal project notes (not tracked)
 AGENTS.md
 NOTES.md

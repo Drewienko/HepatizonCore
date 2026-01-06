@@ -121,7 +121,7 @@ void InteractiveShell::processLine(const std::string& line)
 
         app.parse(static_cast<int>(argv.size()), argv.data());
     }
-    catch (const CLI::CallForHelp& e)
+    catch ([[maybe_unused]] const CLI::CallForHelp&)
     {
         m_out << app.help();
     }

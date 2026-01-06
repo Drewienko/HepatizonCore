@@ -18,6 +18,7 @@ if(GTest_FOUND)
         unit/vault_service_native_integration_test.cpp
         unit/tokenizer_test.cpp
         unit/console_utils_test.cpp
+        unit/zero_allocator_test.cpp
     )
 
     target_include_directories(hepatizoncore_tests PRIVATE

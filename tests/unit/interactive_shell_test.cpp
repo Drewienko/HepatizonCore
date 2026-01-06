@@ -63,7 +63,7 @@ TEST_F(InteractiveShellTest, CompleteSessionFlow)
 {
     fs::path vaultPath = m_testDir / "my_vault";
 
-    m_inContent << "create " << vaultPath.string() << "\n";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
     m_inContent << "put my_key\n";
     m_inContent << "get my_key\n";
     m_inContent << "ls\n";
@@ -100,7 +100,7 @@ TEST_F(InteractiveShellTest, CompleteSessionFlow)
 TEST_F(InteractiveShellTest, CreateFailsOnPasswordMismatch)
 {
     fs::path vaultPath = m_testDir / "mismatch_vault";
-    m_inContent << "create " << vaultPath.string() << "\n";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
     m_inContent << "exit\n";
 
     int callCount = 0;
@@ -131,7 +131,7 @@ TEST_F(InteractiveShellTest, CreateFailsIfVaultAlreadyExists)
         FAIL() << "Setup failed: Could not create initial vault. Error code: " << static_cast<int>(err);
     }
 
-    m_inContent << "create " << vaultPath.string() << "\n";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
     m_inContent << "exit\n";
 
     auto dummyReader = [](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };
@@ -155,7 +155,7 @@ TEST_F(InteractiveShellTest, OpenFailsOnWrongPassword)
         }
     }
 
-    m_inContent << "open " << vaultPath.string() << "\n";
+    m_inContent << "open " << vaultPath.generic_string() << "\n";
     m_inContent << "exit\n";
 
     auto badPassReader = [](const std::string&) { return hepatizon::security::secureStringFrom("WRONG_PASS"); };
@@ -168,7 +168,7 @@ TEST_F(InteractiveShellTest, OpenFailsOnWrongPassword)
 
 TEST_F(InteractiveShellTest, OpenFailsOnMissingDirectory)
 {
-    m_inContent << "open " << (m_testDir / "non_existent").string() << "\n";
+    m_inContent << "open " << (m_testDir / "non_existent").generic_string() << "\n";
     m_inContent << "exit\n";
 
     auto dummyReader = [](const std::string&) { return hepatizon::security::SecureString{}; };
@@ -244,7 +244,7 @@ TEST_F(InteractiveShellTest, SyntaxErrorOnBadArguments)
 TEST_F(InteractiveShellTest, HandlesQuotedArguments)
 {
     fs::path vaultPath = m_testDir / "vault with spaces";
-    std::string vaultPathStr = vaultPath.string();
+    std::string vaultPathStr = vaultPath.generic_string();
 
     m_inContent << "create \"" << vaultPathStr << "\"\n";
     m_inContent << "exit\n";
@@ -312,7 +312,7 @@ TEST_F(InteractiveShellTest, IgnoresExcessiveWhitespace)
 {
     fs::path vaultPath = m_testDir / "whitespace_vault";
 
-    m_inContent << "   create    " << vaultPath.string() << "   \n";
+    m_inContent << "   create    " << vaultPath.generic_string() << "   \n";
     m_inContent << "\t exit \t \n";
 
     auto mockReader = [&](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };

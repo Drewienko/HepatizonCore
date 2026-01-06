@@ -51,3 +51,36 @@ if(HEPC_ENABLE_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+if(CMAKE_CXX_FLAGS MATCHES "--coverage")
+    find_program(GCOVR_PATH gcovr)
+
+    if(GCOVR_PATH)
+        add_custom_target(coverage
+
+            COMMAND ctest --output-on-failure
+            
+
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/coverage-report
+
+
+            COMMAND ${GCOVR_PATH} -r ${CMAKE_SOURCE_DIR}
+                    --object-directory ${CMAKE_BINARY_DIR}
+                    --html-details ${CMAKE_SOURCE_DIR}/coverage-report/index.html
+                    --exclude "tests/"
+                    --exclude "vcpkg/"
+                    --exclude "third_party/"
+                    --exclude "out/"
+                    --exclude "src/ui/cli/main.cpp"
+                    --gcov-ignore-errors=no_working_dir_found
+            
+
+            COMMAND ${CMAKE_COMMAND} -E echo "Coverage report generated: ${CMAKE_SOURCE_DIR}/coverage-report/index.html"
+            
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Running tests and generating code coverage report..."
+        )
+    else()
+        message(WARNING "gcovr not found! 'coverage' target will not be available.")
+    endif()
+endif()

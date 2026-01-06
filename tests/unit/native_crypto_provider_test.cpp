@@ -99,3 +99,58 @@ TEST(NativeCryptoProvider, RejectsWrongKeySize)
     EXPECT_THROW((void)provider->aeadEncrypt(std::span<const std::uint8_t>{ key }, asBytes("x"), asBytes("")),
                  std::invalid_argument);
 }
+
+TEST(NativeCryptoProvider, DeriveMasterKeyValidatesPolicy)
+{
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
+    constexpr std::string_view kPassword{ "password" };
+    constexpr std::uint32_t kValidMem{ 8U };
+
+    hepatizon::crypto::KdfMetadata validMeta{};
+    validMeta.policyVersion = hepatizon::crypto::g_kKdfPolicyVersion;
+    validMeta.algorithm = hepatizon::crypto::KdfAlgorithm::Argon2id;
+    validMeta.argon2Version = hepatizon::crypto::g_kArgon2VersionV13;
+    validMeta.derivedKeyBytes = hepatizon::crypto::g_kMasterKeyBytes;
+    validMeta.argon2id = { 1U, kValidMem, 1U };
+
+    {
+        auto meta = validMeta;
+        meta.policyVersion = 999U;
+        EXPECT_THROW((void)provider->deriveMasterKey(asBytes(kPassword), meta), std::invalid_argument);
+    }
+
+    {
+        auto meta = validMeta;
+        meta.algorithm = static_cast<hepatizon::crypto::KdfAlgorithm>(0xFF);
+        EXPECT_THROW((void)provider->deriveMasterKey(asBytes(kPassword), meta), std::invalid_argument);
+    }
+
+    {
+        auto meta = validMeta;
+        meta.argon2Version = 0U;
+        EXPECT_THROW((void)provider->deriveMasterKey(asBytes(kPassword), meta), std::invalid_argument);
+    }
+
+    {
+        auto meta = validMeta;
+        meta.derivedKeyBytes = 16U;
+        EXPECT_THROW((void)provider->deriveMasterKey(asBytes(kPassword), meta), std::invalid_argument);
+    }
+}
+
+TEST(NativeCryptoProvider, DeriveSubkeyValidatesInputs)
+{
+    auto provider{ hepatizon::crypto::providers::makeNativeCryptoProvider() };
+
+    const std::vector<std::uint8_t> kMasterKey(32, 0x01);
+    constexpr std::string_view kContext{ "context" };
+    constexpr std::size_t kValidLen{ 32U };
+
+    EXPECT_THROW((void)provider->deriveSubkey({}, asBytes(kContext), kValidLen), std::invalid_argument);
+
+    EXPECT_THROW((void)provider->deriveSubkey(kMasterKey, {}, kValidLen), std::invalid_argument);
+
+    EXPECT_THROW((void)provider->deriveSubkey(kMasterKey, asBytes(kContext), 0), std::invalid_argument);
+
+    EXPECT_THROW((void)provider->deriveSubkey(kMasterKey, asBytes(kContext), 65), std::invalid_argument);
+}
