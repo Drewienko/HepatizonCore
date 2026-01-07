@@ -12,6 +12,8 @@ target_include_directories(hepatizon_adapters_headers
 )
 target_compile_features(hepatizon_adapters_headers INTERFACE cxx_std_20)
 
+target_link_libraries(hepatizon_adapters_headers INTERFACE hepatizon_interfaces)
+
 add_subdirectory(security)
 add_subdirectory(core)
 add_subdirectory(crypto)

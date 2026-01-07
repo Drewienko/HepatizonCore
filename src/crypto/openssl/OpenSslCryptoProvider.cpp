@@ -98,14 +98,9 @@ EvpKdfPtr fetchArgon2idKdf()
 
 EvpMacPtr fetchBlake2bMac()
 {
-    // OpenSSL MAC algorithm names are string-based. Try common variants.
-    constexpr std::array<const char*, 2> kNames{ "BLAKE2BMAC", "BLAKE2B-MAC" };
-    for (const char* name : kNames)
+    if (EVP_MAC * mac{ EVP_MAC_fetch(nullptr, "BLAKE2BMAC", nullptr) }; mac != nullptr)
     {
-        if (EVP_MAC * mac{ EVP_MAC_fetch(nullptr, name, nullptr) }; mac != nullptr)
-        {
-            return EvpMacPtr{ mac, &EVP_MAC_free };
-        }
+        return EvpMacPtr{ mac, &EVP_MAC_free };
     }
     return EvpMacPtr{ nullptr, &EVP_MAC_free };
 }

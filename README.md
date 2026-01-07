@@ -1,8 +1,12 @@
 # HepatizonCore
 
-HepatizonCore is my modular password manager prototype in C++20 (pet / learning project) with a temporary debug CLI harness and an optional Qt 6 GUI stub.
+HepatizonCore is a modular password manager prototype in C++20 (pet / learning project). It features a secure core architecture, an interactive CLI shell, and a Qt 6 GUI.
 
-> Status (2026-01-06): early-stage WIP. Implemented: security primitives + OS CSPRNG/wipe, Argon2id KDF contract (`KdfMetadata` + `KdfPolicy`), crypto providers (Native + optional OpenSSL), and a minimal vault bootstrap (`vault.meta` + `vault.db`) with `VaultService` create/open/rekey + encrypted secret blobs. Rekey does not re-encrypt stored blobs (the vault uses a random secrets key stored inside the encrypted header). Auto-migration exists only for the vault header schema (v1 -> v2). CLI is now an interactive shell (CLI11-based) with tokenization and secure password reading.
+> **Status (2026-01-07):**
+> * **Core:** Security primitives, Argon2id KDF, Crypto providers (Native + OpenSSL), VaultService (create/open/rekey).
+> * **GUI:** Implemented "Shell + Views" architecture (Qt 6). Login logic is fully integrated with the Core. Dashboard and AddSecret views are scaffolded.
+> * **System:** Partial WSLg support with specific fixes for window positioning (xcb) and system tray fallbacks.
+> * **Quality:** Integrated Testing (GTest + QtTest) and automated Code Coverage (gcovr).
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
@@ -12,6 +16,11 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 **Do not trust this with your real passwords.** I am not responsible for any data loss. Use this repo to review the code and architecture, not to store your secrets.
 
 ---
+
+## Gallery (on WSLg)
+| Login | Dashboard |
+|:---:|:---:|
+| ![](docs/screenshots/LoginView.png) | ![](docs/screenshots/DashboardView.png) |
 
 ## Key capabilities
 - UI: Interactive CLI shell (tokenization, quoting, history-ready) + Qt GUI stub.

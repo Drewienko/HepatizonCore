@@ -93,9 +93,10 @@ vcpkg_installed/
 
 .cache/
 coverage-report/
+build_coverage/
 # Personal project notes (not tracked)
 AGENTS.md
 NOTES.md
 RESEARCH.md
 REPO_GUIDE.md
-
+.aignore

@@ -68,6 +68,41 @@ if(GTest_FOUND)
         )
         target_compile_definitions(hepatizoncore_tests PRIVATE HEPC_ENABLE_OPENSSL=1)
     endif()
+
+    if(HEPC_BUILD_GUI)
+        find_package(Qt6 COMPONENTS Widgets Test REQUIRED)
+
+        add_executable(hepatizon_gui_tests
+            gui/main.cpp
+            gui/TestLoginView.cpp
+            ../src/ui/gui/views/LoginView.cpp
+        )
+
+        target_include_directories(hepatizon_gui_tests PRIVATE
+            gui
+            ../src/ui/gui
+            ../include
+            ../adapters/include
+        )
+
+        target_link_libraries(hepatizon_gui_tests PRIVATE
+            GTest::gtest
+            Qt6::Widgets
+            Qt6::Test
+            hepatizon_core
+            hepatizon_crypto_native
+            hepatizon_storage_sqlite
+            hepatizon_security
+        )
+
+        set_target_properties(hepatizon_gui_tests PROPERTIES 
+            AUTOMOC ON
+            CXX_STANDARD 20
+        )
+
+        add_test(NAME hepatizon_gui_tests COMMAND hepatizon_gui_tests)
+        hepc_set_common_warnings(hepatizon_gui_tests)
+    endif()
 else()
     message(STATUS "GTest not found; skipping tests target.")
 endif()

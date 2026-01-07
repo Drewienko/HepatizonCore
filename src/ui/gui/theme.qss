@@ -1,0 +1,109 @@
+QWidget {
+    background-color: #1E1E1E;
+    color: #F0F0F0;
+    font-family: "Segoe UI", "Roboto", sans-serif;
+    font-size: 14px;
+}
+
+QLabel {
+    color: #E0E0E0;
+}
+
+QLineEdit {
+    background-color: #2E2E2E;
+    border: 1px solid #3E3E3E;
+    border-radius: 0px;
+    padding: 8px;
+    color: #F5D163;
+    font-family: "Consolas", "Courier New", monospace;
+    font-weight: bold;
+    selection-background-color: #F5D163;
+    selection-color: #000000;
+}
+
+QLineEdit:focus {
+    border: 1px solid #F5D163;
+    background-color: #252525;
+}
+
+QPushButton {
+    background-color: #2E2E2E;
+    border: 1px solid #F5D163;
+    color: #F5D163;
+    padding: 10px 24px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-radius: 0px;
+}
+
+QPushButton:hover {
+    background-color: #F5D163;
+    color: #1E1E1E;
+}
+
+QPushButton:pressed {
+    background-color: #D4B040;
+    border-color: #D4B040;
+}
+
+QPushButton#GhostButton {
+    background-color: transparent;
+    border: 1px solid #555555;
+    color: #888888;
+}
+
+QPushButton#GhostButton:hover {
+    border-color: #F5D163;
+    color: #F5D163;
+}
+
+QListWidget {
+    background-color: #121212;
+    border: 1px solid #2E2E2E;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #222;
+    color: #AAAAAA;
+}
+
+QListWidget::item:selected {
+    background-color: #2E2E2E;
+    color: #F5D163;
+    border-left: 4px solid #F5D163;
+}
+
+QScrollBar:vertical {
+    background: #1E1E1E;
+    width: 6px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #3E3E3E;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #F5D163;
+}
+
+QPushButton#IconButton, QPushButton#CloseButton {
+    padding: 0px;         
+    border: none;    
+    background-color: transparent;
+    font-size: 18px;
+}
+
+QPushButton#IconButton:hover, QPushButton#CloseButton:hover {
+    background-color: #3E3E3E;
+    color: #F5D163;
+}
+
+QPushButton#CloseButton:hover {
+    background-color: #D32F2F;
+    color: white;
+}

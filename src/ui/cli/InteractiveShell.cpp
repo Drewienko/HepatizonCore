@@ -64,7 +64,7 @@ void InteractiveShell::processLine(const std::string& line)
 
     std::vector<std::string> args;
     args.reserve(userArgs.size() + 1);
-    args.push_back("hepc");
+    args.emplace_back("hepc");
     args.insert(args.end(), userArgs.begin(), userArgs.end());
 
     CLI::App app{ "Hepatizon Shell" };

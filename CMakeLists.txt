@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(HepatizonCore
-    VERSION 0.0.1
+    VERSION 0.0.2
     LANGUAGES C CXX
 )
 
@@ -12,7 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(HEPC_BUILD_CLI "Build the CLI application" ON)
-option(HEPC_BUILD_GUI "Build the GUI application (Qt6)" OFF)
+option(HEPC_BUILD_GUI "Build the GUI application (Qt6)" ON)
 option(HEPC_ENABLE_TESTS "Build tests" OFF)
 option(HEPC_ENABLE_OPENSSL "Enable OpenSSL crypto provider" OFF)
 option(HEPC_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
@@ -72,6 +72,9 @@ if(CMAKE_CXX_FLAGS MATCHES "--coverage")
                     --exclude "third_party/"
                     --exclude "out/"
                     --exclude "src/ui/cli/main.cpp"
+                    --exclude "src/ui/gui/main.cpp"  
+                    --exclude ".*_autogen/"
+                    --exclude-directories ".*CompilerId.*"
                     --gcov-ignore-errors=no_working_dir_found
             
 

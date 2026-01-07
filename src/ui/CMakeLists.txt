@@ -8,7 +8,6 @@ if(HEPC_BUILD_CLI)
         cli/Tokenizer.cpp
     )
 
-    # Allow headers inside cli/ to be included comfortably
     target_include_directories(hepatizoncore_cli PRIVATE cli)
 
     target_link_libraries(hepatizoncore_cli PRIVATE
@@ -21,7 +20,7 @@ if(HEPC_BUILD_CLI)
 
     if(HEPC_ENABLE_OPENSSL)
         target_link_libraries(hepatizoncore_cli PRIVATE hepatizon_crypto_openssl)
-        # Critical: Pass the definition to the C++ code
+
         target_compile_definitions(hepatizoncore_cli PRIVATE HEPC_ENABLE_OPENSSL=1)
     endif()
 
@@ -31,13 +30,41 @@ endif()
 if(HEPC_BUILD_GUI)
     find_package(Qt6 COMPONENTS Widgets REQUIRED)
 
+    set(CMAKE_AUTOMOC ON)
+
+    set(CMAKE_AUTORCC ON)
+
+    set(CMAKE_AUTOUIC OFF)
+
     add_executable(hepatizoncore_gui
         gui/main.cpp
+        gui/MainWindow.cpp
+        gui/MainWindow.hpp            
+        gui/components/TitleBar.cpp
+        gui/components/TitleBar.hpp
+        gui/views/LoginView.cpp
+        gui/views/LoginView.hpp
+        gui/views/DashboardView.cpp
+        gui/views/DashboardView.hpp    
+        gui/views/AddSecretView.cpp
+        gui/views/AddSecretView.hpp
+        resources.qrc
     )
-    target_link_libraries(hepatizoncore_gui PRIVATE hepatizon_core Qt6::Widgets)
+    
+    target_include_directories(hepatizoncore_gui PRIVATE gui)
+
+
+    target_link_libraries(hepatizoncore_gui PRIVATE 
+        hepatizon_core 
+        Qt6::Widgets
+        hepatizon_adapters_headers
+        hepatizon_crypto_native
+        hepatizon_storage_sqlite
+    )
+
     set_target_properties(hepatizoncore_gui PROPERTIES
         WIN32_EXECUTABLE TRUE
-        MACOSX_BUNDLE TRUE
     )
+    
     hepc_set_common_warnings(hepatizoncore_gui)
 endif()

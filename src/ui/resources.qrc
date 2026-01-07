@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="icon.svg">../../resources/assets/icons/icon.svg</file>
+        <file alias="theme.qss">gui/theme.qss</file>
+    </qresource>
+</RCC>
