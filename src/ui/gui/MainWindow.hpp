@@ -1,6 +1,8 @@
 #ifndef SRC_UI_GUI_MAINWINDOW_HPP
 #define SRC_UI_GUI_MAINWINDOW_HPP
 #include "components/TitleBar.hpp"
+#include "components/SecretDialog.hpp"
+#include "hepatizon/core/Session.hpp"
 #include "hepatizon/core/VaultService.hpp"
 #include "views/AddSecretView.hpp"
 #include "views/DashboardView.hpp"
@@ -11,6 +13,7 @@
 #include <QScreen>
 #include <QStackedWidget>
 #include <QSystemTrayIcon>
+#include <QTimer>
 
 class MainWindow : public QMainWindow
 {
@@ -25,19 +28,24 @@ public:
 protected:
     void showEvent(QShowEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void setupUi();
     void updatePosition();
     void setupTray();
+    void lockVault(const QString& reason);
+    void showSecretDialog(const std::string& key);
 
     hepatizon::core::VaultService& m_service;
 
-    std::shared_ptr<hepatizon::core::UnlockedVault> m_activeVault;
+    std::shared_ptr<hepatizon::core::Session> m_session;
     std::filesystem::path m_vaultPath;
 
     TitleBar* m_titleBar{ nullptr };
     QStackedWidget* m_stack{ nullptr };
+    QTimer* m_sessionTimer{ nullptr };
+    SecretDialog* m_secretDialog{ nullptr };
 
     LoginView* m_loginView{ nullptr };
     DashboardView* m_dashboardView{ nullptr };

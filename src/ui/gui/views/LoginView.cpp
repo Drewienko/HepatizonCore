@@ -1,4 +1,5 @@
 #include "LoginView.hpp"
+#include "hepatizon/core/Session.hpp"
 #include "hepatizon/security/ScopeWipe.hpp"
 
 #include <QDir>
@@ -7,11 +8,23 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QStandardPaths>
+#include <QtGlobal>
 #include <QVBoxLayout>
+#include <chrono>
 
 namespace
 {
 constexpr int g_inputHeight = 40;
+constexpr auto g_defaultSessionTimeout = std::chrono::minutes{ 5 };
+
+std::filesystem::path toVaultPath(const QString& input)
+{
+#if defined(Q_OS_WIN)
+    return std::filesystem::path{ input.toStdWString() };
+#else
+    return std::filesystem::path{ input.toStdString() };
+#endif
+}
 }
 
 LoginView::LoginView(hepatizon::core::VaultService& service, QWidget* parent) : QWidget(parent), m_service(service)
@@ -34,11 +47,11 @@ void LoginView::setupUi()
 
     auto* pathLayout = new QHBoxLayout();
     m_pathInput = new QLineEdit(this);
-    m_pathInput->setPlaceholderText("Path to vault.db");
+    m_pathInput->setPlaceholderText("Vault directory");
     m_pathInput->setFixedHeight(g_inputHeight);
 
     QString docsPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    m_pathInput->setText(QDir(docsPath).filePath("vault.db"));
+    m_pathInput->setText(QDir(docsPath).filePath("HepatizonVault"));
 
     auto* browseBtn = new QPushButton("...", this);
     browseBtn->setFixedSize(40, g_inputHeight);
@@ -93,12 +106,11 @@ void LoginView::setupUi()
 
 void LoginView::onBrowseClicked()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, "Select Vault File", m_pathInput->text(),
-                                                    "Vault Files (*.db);;All Files (*)");
+    QString dir = QFileDialog::getExistingDirectory(this, "Select Vault Directory", m_pathInput->text());
 
-    if (!fileName.isEmpty())
+    if (!dir.isEmpty())
     {
-        m_pathInput->setText(fileName);
+        m_pathInput->setText(dir);
     }
 }
 
@@ -123,6 +135,8 @@ template <typename Func> bool LoginView::processPasswordAndExecute(Func action)
     }
 
     QByteArray authData = password.toUtf8();
+    password.fill(QChar(0));
+    password.clear();
     authData.detach();
     hepatizon::security::SecureString secureKey(authData.begin(), authData.end());
 
@@ -138,26 +152,39 @@ template <typename Func> bool LoginView::processPasswordAndExecute(Func action)
 
 void LoginView::onUnlockClicked()
 {
-    std::string path = m_pathInput->text().toStdString();
+    std::filesystem::path path = toVaultPath(m_pathInput->text());
+
+    if (path.empty())
+    {
+        QMessageBox::warning(this, "Validation", "Vault directory is required.");
+        return;
+    }
 
     if (!m_service.vaultExists(path))
     {
-        QMessageBox::warning(this, "Error", "Vault file not found. Create a new one?");
+        QMessageBox::warning(this, "Error", "Vault directory not found. Create a new one?");
         return;
     }
 
     auto action = [&](const hepatizon::security::SecureString& key)
     {
-        auto result = m_service.openVault(path, key);
+        try
+        {
+            auto result = m_service.openVault(path, key);
 
-        if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&result))
-        {
-            auto vaultPtr = std::make_shared<hepatizon::core::UnlockedVault>(std::move(*vault));
-            emit vaultUnlocked(vaultPtr, path);
+            if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&result))
+            {
+                auto session = std::make_shared<hepatizon::core::Session>(std::move(*vault), g_defaultSessionTimeout);
+                emit vaultUnlocked(session, path);
+            }
+            else
+            {
+                QMessageBox::critical(this, "Access Denied", "Invalid password or corrupted vault.");
+            }
         }
-        else
+        catch (const std::exception& e)
         {
-            QMessageBox::critical(this, "Access Denied", "Invalid password or corrupted vault.");
+            QMessageBox::critical(this, "Error", e.what());
         }
     };
 
@@ -169,32 +196,48 @@ void LoginView::onUnlockClicked()
 
 void LoginView::onCreateClicked()
 {
-    std::string path = m_pathInput->text().toStdString();
+    std::filesystem::path path = toVaultPath(m_pathInput->text());
+
+    if (path.empty())
+    {
+        QMessageBox::warning(this, "Validation", "Vault directory is required.");
+        return;
+    }
 
     if (m_service.vaultExists(path))
     {
-        auto reply =
-            QMessageBox::question(this, "Confirm", "Vault exists. Overwrite?", QMessageBox::Yes | QMessageBox::No);
-        if (reply != QMessageBox::Yes)
-            return;
+        QMessageBox::information(this, "Vault Exists", "Vault already exists. Use UNLOCK instead.");
+        return;
     }
 
     auto action = [&](const hepatizon::security::SecureString& key)
     {
-        auto result = m_service.createVault(path, key);
+        try
+        {
+            auto result = m_service.createVault(path, key);
 
-        if (std::holds_alternative<hepatizon::core::VaultError>(result))
-        {
-            QMessageBox::critical(this, "Error", "Failed to create vault.");
-        }
-        else
-        {
-            auto openRes = m_service.openVault(path, key);
-            if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&openRes))
+            if (std::holds_alternative<hepatizon::core::VaultError>(result))
             {
-                auto vaultPtr = std::make_shared<hepatizon::core::UnlockedVault>(std::move(*vault));
-                emit vaultUnlocked(vaultPtr, path);
+                QMessageBox::critical(this, "Error", "Failed to create vault.");
             }
+            else
+            {
+                auto openRes = m_service.openVault(path, key);
+                if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&openRes))
+                {
+                    auto session =
+                        std::make_shared<hepatizon::core::Session>(std::move(*vault), g_defaultSessionTimeout);
+                    emit vaultUnlocked(session, path);
+                }
+                else
+                {
+                    QMessageBox::critical(this, "Error", "Vault created but failed to unlock.");
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            QMessageBox::critical(this, "Error", e.what());
         }
     };
 

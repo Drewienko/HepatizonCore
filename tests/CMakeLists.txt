@@ -19,6 +19,7 @@ if(GTest_FOUND)
         unit/tokenizer_test.cpp
         unit/console_utils_test.cpp
         unit/zero_allocator_test.cpp
+        unit/session_test.cpp
     )
 
     target_include_directories(hepatizoncore_tests PRIVATE

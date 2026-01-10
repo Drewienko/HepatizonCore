@@ -7,6 +7,12 @@
 #include <QWidget>
 #include <filesystem>
 #include <memory>
+
+namespace hepatizon::core
+{
+class Session;
+}
+
 class LoginView : public QWidget
 {
     Q_OBJECT
@@ -14,7 +20,7 @@ public:
     explicit LoginView(hepatizon::core::VaultService& service, QWidget* parent = nullptr);
 
 signals:
-    void vaultUnlocked(std::shared_ptr<hepatizon::core::UnlockedVault> vault, std::filesystem::path path);
+    void vaultUnlocked(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path);
 
 private slots:
     void onBrowseClicked();

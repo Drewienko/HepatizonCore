@@ -36,7 +36,10 @@ jobs:
       - name: Install system tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config
+          sudo apt-get install -y ninja-build pkg-config qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+
+      - name: Export Qt prefix
+        run: echo "QT6_PREFIX=/usr" >> "$GITHUB_ENV"
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }} -DHEPC_ENABLE_WARNINGS_AS_ERRORS=ON -DHEPC_ENABLE_SANITIZERS=ON
@@ -48,6 +51,7 @@ jobs:
         env:
           ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1"
           UBSAN_OPTIONS: "halt_on_error=1"
+          QT_QPA_PLATFORM: "offscreen"
         run: ctest --preset ${{ matrix.preset }}
 
   windows:
@@ -69,6 +73,18 @@ jobs:
         uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be # v2.0.2
         with:
           cmake-version: "3.31.10"
+
+      - name: Setup Qt
+        uses: jurplel/install-qt-action@d325aaf2a8baeeda41ad0b5d39f84a6af9bcf005 # v4.3.0
+        with:
+          version: "6.8.2"
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Export Qt prefix
+        shell: pwsh
+        run: |
+          "QT6_PREFIX=$env:Qt6_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }} -DHEPC_ENABLE_WARNINGS_AS_ERRORS=ON

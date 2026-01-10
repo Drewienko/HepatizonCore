@@ -29,6 +29,12 @@ void DashboardView::setupUi()
     m_btnAdd->setObjectName("IconButton");
     connect(m_btnAdd, &QPushButton::clicked, this, &DashboardView::addClicked);
 
+    m_btnLock = new QPushButton("🔒", this);
+    m_btnLock->setFixedSize(35, 35);
+    m_btnLock->setCursor(Qt::PointingHandCursor);
+    m_btnLock->setObjectName("IconButton");
+    connect(m_btnLock, &QPushButton::clicked, this, &DashboardView::lockClicked);
+
     m_btnSettings = new QPushButton("⚙", this);
     m_btnSettings->setFixedSize(35, 35);
     m_btnSettings->setCursor(Qt::PointingHandCursor);
@@ -37,6 +43,7 @@ void DashboardView::setupUi()
 
     toolbarLayout->addWidget(m_searchBar);
     toolbarLayout->addWidget(m_btnAdd);
+    toolbarLayout->addWidget(m_btnLock);
     toolbarLayout->addWidget(m_btnSettings);
     layout->addLayout(toolbarLayout);
 
@@ -48,9 +55,9 @@ void DashboardView::setupUi()
     layout->addWidget(m_listWidget);
 }
 
-void DashboardView::loadVault(std::shared_ptr<hepatizon::core::UnlockedVault> vault, std::filesystem::path path)
+void DashboardView::loadVault(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path)
 {
-    m_vault = vault;
+    m_session = session;
     m_vaultPath = path;
     m_searchBar->clear();
     refreshList();
@@ -59,14 +66,14 @@ void DashboardView::loadVault(std::shared_ptr<hepatizon::core::UnlockedVault> va
 void DashboardView::refreshList()
 {
     m_listWidget->clear();
-    if (!m_vault)
+    if (!m_session)
         return;
 
-    auto result = m_service.listSecretKeys(m_vaultPath, *m_vault);
+    auto result = m_service.listSecretKeys(m_vaultPath, m_session->vault());
 
     if (std::holds_alternative<hepatizon::core::VaultError>(result))
     {
-
+        QMessageBox::critical(this, "Error", "Failed to load vault entries.");
         return;
     }
 

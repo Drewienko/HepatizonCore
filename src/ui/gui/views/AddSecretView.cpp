@@ -11,9 +11,9 @@ AddSecretView::AddSecretView(hepatizon::core::VaultService& service, QWidget* pa
     setupUi();
 }
 
-void AddSecretView::setVaultContext(std::shared_ptr<hepatizon::core::UnlockedVault> vault, std::filesystem::path path)
+void AddSecretView::setVaultContext(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path)
 {
-    m_vault = vault;
+    m_session = session;
     m_vaultPath = path;
 }
 
@@ -62,7 +62,12 @@ void AddSecretView::setupUi()
     m_btnCancel = new QPushButton("CANCEL", this);
     m_btnCancel->setCursor(Qt::PointingHandCursor);
     m_btnCancel->setObjectName("GhostButton");
-    connect(m_btnCancel, &QPushButton::clicked, this, &AddSecretView::cancelClicked);
+    connect(m_btnCancel, &QPushButton::clicked,
+            [this]()
+            {
+                resetFields();
+                emit cancelClicked();
+            });
 
     m_btnSave = new QPushButton("SAVE", this);
     m_btnSave->setCursor(Qt::PointingHandCursor);
@@ -76,8 +81,11 @@ void AddSecretView::setupUi()
 
 void AddSecretView::onSaveClicked()
 {
-    if (!m_vault)
+    if (!m_session)
+    {
+        QMessageBox::warning(this, "No Vault", "Open a vault before saving secrets.");
         return;
+    }
 
     QString key = m_keyInput->text();
     QString value = m_valueInput->text();
@@ -89,12 +97,18 @@ void AddSecretView::onSaveClicked()
     }
 
     QByteArray valueBytes = value.toUtf8();
+    value.fill(QChar(0));
+    value.clear();
     valueBytes.detach();
     hepatizon::security::SecureString secureVal(valueBytes.begin(), valueBytes.end());
 
     hepatizon::security::secureWipe(std::span{ valueBytes.data(), static_cast<size_t>(valueBytes.size()) });
+    if (m_valueInput != nullptr)
+    {
+        m_valueInput->clear();
+    }
 
-    auto result = m_service.putSecret(m_vaultPath, *m_vault, key.toStdString(), secureVal);
+    auto result = m_service.putSecret(m_vaultPath, m_session->vault(), key.toStdString(), secureVal);
 
     if (std::holds_alternative<hepatizon::core::VaultError>(result))
     {
@@ -102,6 +116,7 @@ void AddSecretView::onSaveClicked()
     }
     else
     {
+        resetFields();
         emit secretSaved();
     }
 }

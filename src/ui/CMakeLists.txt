@@ -42,6 +42,8 @@ if(HEPC_BUILD_GUI)
         gui/MainWindow.hpp            
         gui/components/TitleBar.cpp
         gui/components/TitleBar.hpp
+        gui/components/SecretDialog.cpp
+        gui/components/SecretDialog.hpp
         gui/views/LoginView.cpp
         gui/views/LoginView.hpp
         gui/views/DashboardView.cpp

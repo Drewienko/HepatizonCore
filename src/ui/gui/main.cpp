@@ -4,12 +4,18 @@
 #include "hepatizon/storage/sqlite/SqliteStorageRepositoryFactory.hpp"
 #include <QApplication>
 #include <QFile>
+#include <QtGlobal>
 
 int main(int argc, char* argv[])
 {
-    qputenv("QT_QPA_PLATFORM", "xcb");
+#if defined(__linux__)
+    if (qEnvironmentVariableIsSet("QT_QPA_PLATFORM") == false)
+    {
+        qputenv("QT_QPA_PLATFORM", "xcb");
+    }
+#endif
     QApplication app(argc, argv);
-    app.setQuitOnLastWindowClosed(false);
+    QApplication::setQuitOnLastWindowClosed(false);
     QApplication::setApplicationName("HepatizonCore");
 
     QFile styleFile(":/theme.qss");

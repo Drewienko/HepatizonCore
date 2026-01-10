@@ -4,7 +4,7 @@ HepatizonCore is a modular password manager prototype in C++20 (pet / learning p
 
 > **Status (2026-01-07):**
 > * **Core:** Security primitives, Argon2id KDF, Crypto providers (Native + OpenSSL), VaultService (create/open/rekey).
-> * **GUI:** Implemented "Shell + Views" architecture (Qt 6). Login logic is fully integrated with the Core. Dashboard and AddSecret views are scaffolded.
+> * **GUI:** Implemented "Shell + Views" architecture (Qt 6). Login logic is fully integrated with the Core. Dashboard and AddSecret views are scaffolded with session timeout handling.
 > * **System:** Partial WSLg support with specific fixes for window positioning (xcb) and system tray fallbacks.
 > * **Quality:** Integrated Testing (GTest + QtTest) and automated Code Coverage (gcovr).
 
@@ -106,7 +106,7 @@ HepatizonCore/
 ```
 
 ## Session + security policy (current)
-- Inactivity timeout is enforced inside core. UI sends activity signals and may run a timer for UX.
+- Core provides a `Session` wrapper (timeout + activity tracking). UI drives the timer (QTimer) and calls `Session::touch()` on input events.
 - Clipboard clear is handled by UI/platform code on logout/expiry.
 - SecureBuffer lives in public headers; OS-specific secure wipe lives in src/security to avoid platform headers in include/.
 - Monocypher is vendored in `third_party/monocypher/` and included privately by implementation `.cpp` files.
@@ -124,7 +124,7 @@ The current SQLite adapter persists a single encrypted “vault header” row (`
 ---
 
 ## Building
-Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1.
+Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1. CI installs Qt via a dedicated setup step and exports `QT6_PREFIX` for CMake presets.
 If vcpkg complains about your CMake being too old, just install the version it asks for (on Windows I hit a requirement for 3.31.10).
 
 Note: OpenSSL is optional. Enable the OpenSSL provider with `-DHEPC_ENABLE_OPENSSL=ON` (requires OpenSSL).
