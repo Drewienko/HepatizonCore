@@ -42,7 +42,7 @@ I built Hepatizon to practice writing clean, strict C++ code, and to learn more 
 - GUI: Qt 6 (tested on 6.10.1 locally; CI uses distro Qt on Ubuntu runners)
 - Crypto: Monocypher (vendored), OpenSSL (optional)
 - Tests: Google Test
-- Data: SQLite3 (via vcpkg; used by the storage adapter). On Windows the adapter can be built against SQLCipher with `-DHEPC_STORAGE_USE_SQLCIPHER=ON` (encryption-at-rest is still WIP).
+- Data: SQLite3 (via vcpkg; used by the storage adapter). On Windows the adapter can be built against SQLCipher with `-DHEPC_STORAGE_USE_SQLCIPHER=ON`.
 
 **Planned**
 - Data: nlohmann/json

@@ -59,23 +59,25 @@ if(CMAKE_CXX_FLAGS MATCHES "--coverage")
         add_custom_target(coverage
 
             COMMAND ctest --output-on-failure
-            
 
+            COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_SOURCE_DIR}/coverage-report
+            
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/coverage-report
 
 
-            COMMAND ${GCOVR_PATH} -r ${CMAKE_SOURCE_DIR}
-                    --object-directory ${CMAKE_BINARY_DIR}
-                    --html-details ${CMAKE_SOURCE_DIR}/coverage-report/index.html
-                    --exclude "tests/"
-                    --exclude "vcpkg/"
-                    --exclude "third_party/"
-                    --exclude "out/"
-                    --exclude "src/ui/cli/main.cpp"
-                    --exclude "src/ui/gui/main.cpp"  
-                    --exclude ".*_autogen/"
-                    --exclude-directories ".*CompilerId.*"
-                    --gcov-ignore-errors=no_working_dir_found
+            COMMAND ${GCOVR_PATH} 
+                -r ${CMAKE_SOURCE_DIR}
+                --object-directory ${CMAKE_BINARY_DIR}
+                --html-details ${CMAKE_SOURCE_DIR}/coverage-report/index.html
+                --gcov-ignore-errors=no_working_dir_found
+                --exclude "${CMAKE_SOURCE_DIR}/tests/"
+                --exclude "${CMAKE_BINARY_DIR}/"
+                --exclude "/vcpkg/"
+                --exclude "/third_party/"
+                --exclude "${CMAKE_SOURCE_DIR}/src/ui/cli/main.cpp"
+                --exclude "${CMAKE_SOURCE_DIR}/src/ui/gui/main.cpp"
+                --exclude "_autogen/"
+                --exclude-directories "CompilerId"
             
 
             COMMAND ${CMAKE_COMMAND} -E echo "Coverage report generated: ${CMAKE_SOURCE_DIR}/coverage-report/index.html"

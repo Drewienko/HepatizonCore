@@ -162,6 +162,26 @@
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
       }
+    },
+    {
+      "name": "linux-coverage-gcc",
+      "displayName": "Linux Coverage (GCC)",
+      "description": "Debug build with coverage flags enabled",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "HEPC_ENABLE_TESTS": "ON",
+        "HEPC_ENABLE_WARNINGS_AS_ERRORS": "OFF",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": "--coverage",
+        "CMAKE_EXE_LINKER_FLAGS": "--coverage",
+        "CMAKE_SHARED_LINKER_FLAGS": "--coverage",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_PREFIX_PATH": "$env{QT6_PREFIX}"
+      }
     }
   ],
   "buildPresets": [
@@ -208,6 +228,10 @@
       "name": "windows-release-msvc-openssl",
       "configurePreset": "windows-release-msvc-openssl",
       "configuration": "Release"
+    },
+    {
+      "name": "linux-coverage-gcc",
+      "configurePreset": "linux-coverage-gcc"
     }
   ],
   "testPresets": [
@@ -285,6 +309,13 @@
       "name": "windows-release-msvc-openssl",
       "configurePreset": "windows-release-msvc-openssl",
       "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-coverage-gcc",
+      "configurePreset": "linux-coverage-gcc",
       "output": {
         "outputOnFailure": true
       }

@@ -283,7 +283,14 @@ void InteractiveShell::doRm(const std::string& key)
     auto result = m_service.deleteSecret(m_currentPath, *m_vault, key);
     if (std::holds_alternative<hepatizon::core::VaultError>(result))
     {
-        m_out << "Error: Failed to delete secret.\n";
+        if (std::get<hepatizon::core::VaultError>(result) == hepatizon::core::VaultError::NotFound)
+        {
+            m_out << "Error: Secret not found.\n";
+        }
+        else
+        {
+            m_out << "Error: Failed to delete secret.\n";
+        }
     }
     else
     {

@@ -61,3 +61,38 @@ TEST(Session, ZeroTimeoutDisablesExpiration)
     now += Duration{ 999 };
     EXPECT_FALSE(session.isExpired());
 }
+
+TEST(Session, SetTimeoutUpdatesDuration)
+{
+    TimePoint now{};
+    auto provider = [&]() { return now; };
+
+    hepatizon::core::UnlockedVault vault{};
+    Session session{ std::move(vault), Duration{ 5 }, provider };
+
+    EXPECT_EQ(session.timeout(), Duration{ 5 });
+
+    session.setTimeout(Duration{ 10 });
+    EXPECT_EQ(session.timeout(), Duration{ 10 });
+
+    now += Duration{ 6 };
+    EXPECT_FALSE(session.isExpired());
+
+    now += Duration{ 5 };
+    EXPECT_TRUE(session.isExpired());
+}
+
+TEST(Session, VaultAccessorsAndTakeVault)
+{
+    TimePoint now{};
+    auto provider = [&]() { return now; };
+
+    hepatizon::core::UnlockedVault vault{};
+    Session session{ std::move(vault), Duration{ 5 }, provider };
+
+    const auto& constSession = session;
+    EXPECT_EQ(&session.vault(), &constSession.vault());
+
+    auto v = session.takeVault();
+    (void)v;
+}

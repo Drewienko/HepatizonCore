@@ -323,3 +323,138 @@ TEST_F(InteractiveShellTest, IgnoresExcessiveWhitespace)
     EXPECT_EQ(exitCode, 0);
     EXPECT_TRUE(fs::exists(vaultPath));
 }
+
+TEST_F(InteractiveShellTest, QuitCommandWorks)
+{
+    m_inContent << "quit\n";
+
+    auto dummyReader = [](const std::string&) { return hepatizon::security::SecureString{}; };
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, dummyReader);
+    shell.run();
+
+    // The shell should terminate gracefully. No crash and no error message.
+    // The run() method will just finish.
+    SUCCEED();
+}
+
+TEST_F(InteractiveShellTest, ListEmptyVault)
+{
+    fs::path vaultPath = m_testDir / "empty_vault";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
+    m_inContent << "ls\n";
+    m_inContent << "exit\n";
+
+    auto mockReader = [&](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };
+
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, mockReader);
+    shell.run();
+
+    EXPECT_THAT(m_outContent.str(), ::testing::HasSubstr("(empty)"));
+}
+
+TEST_F(InteractiveShellTest, GetNonExistentSecret)
+{
+    fs::path vaultPath = m_testDir / "get_miss_vault";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
+    m_inContent << "get non_existent_key\n";
+    m_inContent << "exit\n";
+
+    auto mockReader = [&](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };
+
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, mockReader);
+    shell.run();
+
+    EXPECT_THAT(m_outContent.str(), ::testing::HasSubstr("Error: Secret not found."));
+}
+
+TEST_F(InteractiveShellTest, RemoveSecretFlow)
+{
+    fs::path vaultPath = m_testDir / "rm_vault";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
+    m_inContent << "put my_key\n";
+    m_inContent << "rm my_key\n";
+    m_inContent << "get my_key\n"; // Should fail after deletion
+    m_inContent << "exit\n";
+
+    auto mockReader = [&](const std::string& prompt) -> hepatizon::security::SecureString
+    {
+        if (prompt.find("Secret Value") != std::string::npos)
+        {
+            return hepatizon::security::secureStringFrom("secret_data");
+        }
+        return hepatizon::security::secureStringFrom("pass123");
+    };
+
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, mockReader);
+    shell.run();
+
+    std::string output = m_outContent.str();
+    EXPECT_THAT(output, ::testing::HasSubstr("Secret stored."));
+    EXPECT_THAT(output, ::testing::HasSubstr("Secret deleted (if it existed)."));
+    EXPECT_THAT(output, ::testing::HasSubstr("Error: Secret not found."));
+}
+
+TEST_F(InteractiveShellTest, RemoveNonExistentSecret)
+{
+    fs::path vaultPath = m_testDir / "rm_ne_vault";
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
+    m_inContent << "rm non_existent_key\n";
+    m_inContent << "exit\n";
+
+    auto mockReader = [&](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };
+
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, mockReader);
+    shell.run();
+
+    EXPECT_THAT(m_outContent.str(), ::testing::HasSubstr("Error: Secret not found."));
+}
+
+TEST_F(InteractiveShellTest, EmptyInputDoesNotCrash)
+{
+    m_inContent << "\n\n   \n\t\n"; // Empty lines and whitespace-only lines
+    m_inContent << "exit\n";
+
+    auto dummyReader = [](const std::string&) { return hepatizon::security::SecureString{}; };
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, dummyReader);
+    shell.run();
+
+    // Just ensure it runs to completion without errors or crashes.
+    EXPECT_THAT(m_outContent.str(), ::testing::Not(::testing::HasSubstr("Syntax Error")));
+}
+
+TEST_F(InteractiveShellTest, EofStopsShell)
+{
+    // No input, stream is at EOF from the start
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, nullptr);
+    int exitCode = shell.run();
+
+    EXPECT_EQ(exitCode, 0);
+    // Expect the shell to start, print the banner, and exit immediately.
+    EXPECT_THAT(m_outContent.str(), ::testing::HasSubstr("HepatizonCore SafeShell"));
+}
+
+TEST_F(InteractiveShellTest, PromptChangesOnOpenAndClose)
+{
+    fs::path vaultPath = m_testDir / "prompt_test_vault";
+    std::string vaultName = vaultPath.filename().string();
+
+    m_inContent << "create " << vaultPath.generic_string() << "\n";
+    m_inContent << "close\n";
+    m_inContent << "exit\n";
+
+    auto mockReader = [&](const std::string&) { return hepatizon::security::secureStringFrom("pass"); };
+
+    hepatizon::ui::cli::InteractiveShell shell(*m_service, m_inContent, m_outContent, mockReader);
+    shell.run();
+
+    std::string output = m_outContent.str();
+
+    // The prompt format is "hepc(FILENAME)> "
+    std::string openPrompt = "hepc(" + vaultName + ")> ";
+    std::string closedPrompt = "hepc> ";
+
+    // After create, it should be open
+    EXPECT_THAT(output, ::testing::HasSubstr(openPrompt));
+    // After close, it should be closed
+    EXPECT_THAT(output, ::testing::HasSubstr("Vault closed.\n" + closedPrompt));
+}
