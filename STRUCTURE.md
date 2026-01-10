@@ -76,7 +76,7 @@ HepatizonSecurity is usable by Core and all adapters.
 ```
 
 ## Smart Storage: KDF Metadata Contract
-Storage is **smart** (structured), meaning the vault stores KDF metadata as explicit fields (not an opaque blob).  
+The vault stores KDF metadata as explicit fields.  
 This makes the KDF metadata part of the **vault format contract**, so it must be stable and versioned.
 
 Implications:
@@ -85,4 +85,4 @@ Implications:
 - KDF policy changes require versioning/migration logic (explicit, not ad-hoc).
 
 Bootstrap note:
-- When using SQLCipher, `KdfMetadata` must be readable *before* the encrypted DB can be opened. A common approach is a small plaintext sidecar metadata file (e.g., `vault.meta`) next to the database file.
+- When using SQLCipher, `KdfMetadata` must be readable *before* the encrypted DB can be opened.

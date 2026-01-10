@@ -27,6 +27,7 @@ signals:
 private slots:
     void onSearchChanged(const QString& text);
     void onItemClicked(QListWidgetItem* item);
+    void onDeleteClicked();
 
 private:
     void setupUi();
@@ -41,6 +42,7 @@ private:
     QPushButton* m_btnAdd{ nullptr };
     QPushButton* m_btnSettings{ nullptr };
     QPushButton* m_btnLock{ nullptr };
+    QPushButton* m_btnDelete{ nullptr };
 };
 
 #endif // SRC_UI_GUI_VIEWS_DASHBOARDVIEW_HPP

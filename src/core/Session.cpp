@@ -24,6 +24,11 @@ bool Session::isExpired() const noexcept
     return (m_now() - m_lastActivity) > m_timeout;
 }
 
+void Session::setTimeout(Duration timeout) noexcept
+{
+    m_timeout = timeout;
+}
+
 Session::Duration Session::timeout() const noexcept
 {
     return m_timeout;
@@ -37,6 +42,13 @@ const UnlockedVault& Session::vault() const noexcept
 UnlockedVault& Session::vault() noexcept
 {
     return m_vault;
+}
+
+UnlockedVault Session::takeVault() noexcept
+{
+    UnlockedVault out{};
+    out = std::move(m_vault);
+    return out;
 }
 
 } // namespace hepatizon::core

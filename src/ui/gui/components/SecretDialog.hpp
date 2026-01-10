@@ -14,6 +14,7 @@ public:
     explicit SecretDialog(QWidget* parent = nullptr);
 
     void setSecret(const QString& key, const QString& value);
+    void setClipboardTimeoutMs(int timeoutMs) noexcept;
 
 private slots:
     void onCopyClicked();
@@ -29,6 +30,7 @@ private:
     QPushButton* m_revealBtn{ nullptr };
     QPushButton* m_closeBtn{ nullptr };
     QTimer* m_clipboardTimer{ nullptr };
+    int m_copyTimeoutMs{ 0 };
 };
 
 #endif // SRC_UI_GUI_COMPONENTS_SECRETDIALOG_HPP

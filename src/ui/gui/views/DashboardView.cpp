@@ -1,4 +1,5 @@
 #include "DashboardView.hpp"
+#include <QIcon>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
@@ -23,26 +24,34 @@ void DashboardView::setupUi()
     m_searchBar->setFixedHeight(35);
     connect(m_searchBar, &QLineEdit::textChanged, this, &DashboardView::onSearchChanged);
 
-    m_btnAdd = new QPushButton("+", this);
+    m_btnAdd = new QPushButton(QIcon(":/icons/add.svg"), "", this);
     m_btnAdd->setFixedSize(35, 35);
     m_btnAdd->setCursor(Qt::PointingHandCursor);
     m_btnAdd->setObjectName("IconButton");
     connect(m_btnAdd, &QPushButton::clicked, this, &DashboardView::addClicked);
 
-    m_btnLock = new QPushButton("🔒", this);
+    m_btnLock = new QPushButton(QIcon(":/icons/lock.svg"), "", this);
     m_btnLock->setFixedSize(35, 35);
     m_btnLock->setCursor(Qt::PointingHandCursor);
     m_btnLock->setObjectName("IconButton");
     connect(m_btnLock, &QPushButton::clicked, this, &DashboardView::lockClicked);
 
-    m_btnSettings = new QPushButton("⚙", this);
+    m_btnSettings = new QPushButton(QIcon(":/icons/settings.svg"), "", this);
     m_btnSettings->setFixedSize(35, 35);
     m_btnSettings->setCursor(Qt::PointingHandCursor);
     m_btnSettings->setObjectName("IconButton");
     connect(m_btnSettings, &QPushButton::clicked, this, &DashboardView::settingsClicked);
 
+    m_btnDelete = new QPushButton(QIcon(":/icons/delete.svg"), "", this);
+    m_btnDelete->setFixedSize(35, 35);
+    m_btnDelete->setCursor(Qt::PointingHandCursor);
+    m_btnDelete->setObjectName("IconButton");
+    m_btnDelete->setEnabled(false);
+    connect(m_btnDelete, &QPushButton::clicked, this, &DashboardView::onDeleteClicked);
+
     toolbarLayout->addWidget(m_searchBar);
     toolbarLayout->addWidget(m_btnAdd);
+    toolbarLayout->addWidget(m_btnDelete);
     toolbarLayout->addWidget(m_btnLock);
     toolbarLayout->addWidget(m_btnSettings);
     layout->addLayout(toolbarLayout);
@@ -61,6 +70,7 @@ void DashboardView::loadVault(std::shared_ptr<hepatizon::core::Session> session,
     m_vaultPath = path;
     m_searchBar->clear();
     refreshList();
+    m_btnDelete->setEnabled(false);
 }
 
 void DashboardView::refreshList()
@@ -97,8 +107,40 @@ void DashboardView::onSearchChanged(const QString& text)
 
 void DashboardView::onItemClicked(QListWidgetItem* item)
 {
+    m_btnDelete->setEnabled(item != nullptr);
     if (item)
     {
         emit secretClicked(item->text().toStdString());
     }
+}
+
+void DashboardView::onDeleteClicked()
+{
+    auto* selectedItem = m_listWidget->currentItem();
+    if (!selectedItem)
+    {
+        return;
+    }
+
+    const auto reply = QMessageBox::question(this, "Confirm Delete",
+                                             tr("Are you sure you want to delete '%1'?")
+                                                 .arg(selectedItem->text()),
+                                             QMessageBox::Yes | QMessageBox::No);
+
+    if (reply != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    const auto key = selectedItem->text().toStdString();
+    auto result = m_service.deleteSecret(m_vaultPath, m_session->vault(), key);
+
+    if (std::holds_alternative<hepatizon::core::VaultError>(result))
+    {
+        QMessageBox::critical(this, "Error", "Failed to delete secret.");
+        return;
+    }
+
+    refreshList();
+    m_btnDelete->setEnabled(false);
 }

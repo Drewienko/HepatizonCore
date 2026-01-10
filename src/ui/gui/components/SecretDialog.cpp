@@ -4,6 +4,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <algorithm>
 
 namespace
 {
@@ -61,6 +62,8 @@ SecretDialog::SecretDialog(QWidget* parent) : QDialog(parent)
     m_clipboardTimer = new QTimer(this);
     m_clipboardTimer->setSingleShot(true);
     connect(m_clipboardTimer, &QTimer::timeout, this, &SecretDialog::clearClipboardIfUnchanged);
+
+    m_copyTimeoutMs = g_copyTimeoutMs;
 }
 
 void SecretDialog::setSecret(const QString& key, const QString& value)
@@ -69,6 +72,11 @@ void SecretDialog::setSecret(const QString& key, const QString& value)
     m_valueInput->setText(value);
     m_valueInput->setEchoMode(QLineEdit::Password);
     m_revealBtn->setChecked(false);
+}
+
+void SecretDialog::setClipboardTimeoutMs(int timeoutMs) noexcept
+{
+    m_copyTimeoutMs = std::max(timeoutMs, 0);
 }
 
 void SecretDialog::onCopyClicked()
@@ -80,7 +88,10 @@ void SecretDialog::onCopyClicked()
     }
 
     clipboard->setText(m_valueInput->text());
-    m_clipboardTimer->start(g_copyTimeoutMs);
+    if (m_copyTimeoutMs > 0)
+    {
+        m_clipboardTimer->start(m_copyTimeoutMs);
+    }
 }
 
 void SecretDialog::onToggleReveal(bool checked)

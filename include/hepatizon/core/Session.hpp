@@ -26,10 +26,12 @@ public:
 
     void touch() noexcept;
     [[nodiscard]] bool isExpired() const noexcept;
+    void setTimeout(Duration timeout) noexcept;
 
     [[nodiscard]] Duration timeout() const noexcept;
     [[nodiscard]] const UnlockedVault& vault() const noexcept;
     [[nodiscard]] UnlockedVault& vault() noexcept;
+    [[nodiscard]] UnlockedVault takeVault() noexcept;
 
 private:
     NowProvider m_now;

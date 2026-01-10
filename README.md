@@ -2,16 +2,16 @@
 
 HepatizonCore is a modular password manager prototype in C++20 (pet / learning project). It features a secure core architecture, an interactive CLI shell, and a Qt 6 GUI.
 
-> **Status (2026-01-07):**
+> **Status (2026-01-10):**
 > * **Core:** Security primitives, Argon2id KDF, Crypto providers (Native + OpenSSL), VaultService (create/open/rekey).
-> * **GUI:** Implemented "Shell + Views" architecture (Qt 6). Login logic is fully integrated with the Core. Dashboard and AddSecret views are scaffolded with session timeout handling.
+> * **GUI:** Qt 6 app with login, dashboard, add‑secret, secret view/copy, and settings (auto‑lock + clipboard + password change).
 > * **System:** Partial WSLg support with specific fixes for window positioning (xcb) and system tray fallbacks.
 > * **Quality:** Integrated Testing (GTest + QtTest) and automated Code Coverage (gcovr).
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
 
-I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefined Behavior (UB) as much as possible. While I implemented the cryptography carefully, this code has not been audited.
+I built Hepatizon to practice writing clean, strict C++ code, and to learn more about the Qt framework. It is not a tool for daily use.
 
 **Do not trust this with your real passwords.** I am not responsible for any data loss. Use this repo to review the code and architecture, not to store your secrets.
 
@@ -20,15 +20,18 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 ## Gallery (on WSLg)
 | Login | Dashboard |
 |:---:|:---:|
-| ![](docs/screenshots/LoginView.png) | ![](docs/screenshots/DashboardView.png) |
+| ![Login](docs/screenshots/LoginView.png) | ![Dashboard](docs/screenshots/DashboardView.png) |
+| **Add Secret** | **Settings** |
+| ![Add Secret](docs/screenshots/AddSecretView.png) | ![Settings](docs/screenshots/Settings.png) |
 
 ## Key capabilities
-- UI: Interactive CLI shell (tokenization, quoting, history-ready) + Qt GUI stub.
+- UI: Interactive CLI shell (tokenization, quoting, history-ready) + Qt GUI.
 - Security primitives: `SecureBuffer` + `ZeroAllocator`, OS-backed `secureWipe`, `ScopeWipe`, constant-time `secureEquals`, OS CSPRNG (`SecureRandom`), memory locking (`mlockall` on Linux).
 - Crypto port: `ICryptoProvider` (KDF + AEAD + Subkey derivation), with a Native provider (Monocypher-backed) and an optional OpenSSL provider (`HEPC_ENABLE_OPENSSL`).
 - KDF: Argon2id with versioned, persisted metadata (`KdfMetadata`) + core-owned defaults (`KdfPolicy`). Native/OpenSSL KDF parity test is best-effort (skips if the OpenSSL Argon2id KDF is unavailable at runtime).
 - Core vault API: `VaultService` (create/open/rekey) and a minimal encrypted blob API (`putSecret`/`getSecret`/`listSecretKeys`/`deleteSecret`).
 - Storage (WIP): `IStorageRepository` + a minimal SQLite adapter storing a plaintext KDF metadata file (`vault.meta`) and an encrypted header row in `vault.db` (payload encryption is via `ICryptoProvider`).
+- Session UX: per‑user auto‑lock timeout (can be disabled) + clipboard auto‑clear in the GUI settings.
 
 ---
 
@@ -36,7 +39,7 @@ I built Hepatizon to practice writing clean, strict C++ and to eliminate Undefin
 **Current**
 - Language: C++20
 - Build: CMake + vcpkg (manifest mode)
-- GUI: Qt 6 (tested on 6.10.1; optional, currently a stub)
+- GUI: Qt 6 (tested on 6.10.1 locally; CI uses distro Qt on Ubuntu runners)
 - Crypto: Monocypher (vendored), OpenSSL (optional)
 - Tests: Google Test
 - Data: SQLite3 (via vcpkg; used by the storage adapter). On Windows the adapter can be built against SQLCipher with `-DHEPC_STORAGE_USE_SQLCIPHER=ON` (encryption-at-rest is still WIP).
@@ -107,14 +110,15 @@ HepatizonCore/
 
 ## Session + security policy (current)
 - Core provides a `Session` wrapper (timeout + activity tracking). UI drives the timer (QTimer) and calls `Session::touch()` on input events.
-- Clipboard clear is handled by UI/platform code on logout/expiry.
+- GUI stores per‑user settings via `QSettings`: auto‑lock timeout (0 = off) and clipboard auto‑clear delay.
+- Clipboard clear is handled by UI/platform code on logout/expiry and after copy.
 - SecureBuffer lives in public headers; OS-specific secure wipe lives in src/security to avoid platform headers in include/.
 - Monocypher is vendored in `third_party/monocypher/` and included privately by implementation `.cpp` files.
 - Crypto providers implement the `ICryptoProvider` port (KDF + AEAD). OpenSSL provider is optional and gated behind `HEPC_ENABLE_OPENSSL`.
 
 ---
 
-## Storage (current direction)
+## Storage
 Vaults are stored as a directory containing two files:
 - `vault.meta` (plaintext): versioned KDF metadata required to derive the master key (`KdfMetadata`). Salt is stored here (salt is not secret).
 - `vault.db` (SQLite): stores encrypted application payloads as AEAD blobs (`AeadBox`). On Windows the adapter can be built against SQLCipher (`HEPC_STORAGE_USE_SQLCIPHER`), but the “encrypted database at rest” story is not finished yet (it currently links to SQLCipher, but does not set a DB key).
@@ -124,7 +128,7 @@ The current SQLite adapter persists a single encrypted “vault header” row (`
 ---
 
 ## Building
-Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1. CI installs Qt via a dedicated setup step and exports `QT6_PREFIX` for CMake presets.
+Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1. CI installs Qt on Ubuntu via distro packages and exports `QT6_PREFIX` for CMake presets.
 If vcpkg complains about your CMake being too old, just install the version it asks for (on Windows I hit a requirement for 3.31.10).
 
 Note: OpenSSL is optional. Enable the OpenSSL provider with `-DHEPC_ENABLE_OPENSSL=ON` (requires OpenSSL).
@@ -155,7 +159,7 @@ Build:
 
 Run:
 - CLI: `out/build/<preset>/src/ui/hepc` (Interactive shell)
-- GUI (stub): `out/build/<preset>/src/ui/hepatizoncore_gui`
+- GUI: `out/build/<preset>/src/ui/hepatizoncore_gui`
 
 ---
 

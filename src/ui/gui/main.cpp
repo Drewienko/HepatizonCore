@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
 #endif
     QApplication app(argc, argv);
     QApplication::setQuitOnLastWindowClosed(false);
+    QApplication::setOrganizationName("Hepatizon");
     QApplication::setApplicationName("HepatizonCore");
 
     QFile styleFile(":/theme.qss");
@@ -35,7 +36,7 @@ int main(int argc, char* argv[])
 
         return QApplication::exec();
     }
-    catch (const std::exception& e)
+    catch (const std::exception&)
     {
         return 1;
     }

@@ -2,5 +2,13 @@
     <qresource prefix="/">
         <file alias="icon.svg">../../resources/assets/icons/icon.svg</file>
         <file alias="theme.qss">gui/theme.qss</file>
+        <file alias="icons/add.svg">../../resources/assets/icons/add.svg</file>
+        <file alias="icons/delete.svg">../../resources/assets/icons/delete.svg</file>
+        <file alias="icons/lock.svg">../../resources/assets/icons/lock.svg</file>
+        <file alias="icons/settings.svg">../../resources/assets/icons/settings.svg</file>
+        <file alias="icons/folder.svg">../../resources/assets/icons/folder.svg</file>
+        <file alias="icons/eye.svg">../../resources/assets/icons/eye.svg</file>
+        <file alias="icons/eye-off.svg">../../resources/assets/icons/eye-off.svg</file>
+        <file alias="icons/key.svg">../../resources/assets/icons/key.svg</file>
     </qresource>
 </RCC>

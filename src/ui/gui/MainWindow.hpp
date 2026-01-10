@@ -1,7 +1,8 @@
 #ifndef SRC_UI_GUI_MAINWINDOW_HPP
 #define SRC_UI_GUI_MAINWINDOW_HPP
-#include "components/TitleBar.hpp"
 #include "components/SecretDialog.hpp"
+#include "components/SettingsDialog.hpp"
+#include "components/TitleBar.hpp"
 #include "hepatizon/core/Session.hpp"
 #include "hepatizon/core/VaultService.hpp"
 #include "views/AddSecretView.hpp"
@@ -34,6 +35,8 @@ private:
     void setupUi();
     void updatePosition();
     void setupTray();
+    void openSettings();
+    void setActiveSession(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path);
     void lockVault(const QString& reason);
     void showSecretDialog(const std::string& key);
 
@@ -46,6 +49,7 @@ private:
     QStackedWidget* m_stack{ nullptr };
     QTimer* m_sessionTimer{ nullptr };
     SecretDialog* m_secretDialog{ nullptr };
+    SettingsDialog* m_settingsDialog{ nullptr };
 
     LoginView* m_loginView{ nullptr };
     DashboardView* m_dashboardView{ nullptr };

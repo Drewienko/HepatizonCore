@@ -1,11 +1,14 @@
 #include "MainWindow.hpp"
+#include "GuiSettings.hpp"
 #include "hepatizon/security/ScopeWipe.hpp"
+#include "hepatizon/security/SecureString.hpp"
 #include <QApplication>
 #include <QEvent>
 #include <QLabel>
 #include <QMessageBox>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <chrono>
 namespace
 {
 constexpr int g_defaultWidth = 360;
@@ -44,6 +47,7 @@ void MainWindow::setupUi()
 
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     m_secretDialog = new SecretDialog(this);
+    m_secretDialog->setClipboardTimeoutMs(hepatizon::ui::readClipboardTimeoutMs());
 
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     m_stack = new QStackedWidget(this);
@@ -55,17 +59,7 @@ void MainWindow::setupUi()
 
     connect(m_loginView, &LoginView::vaultUnlocked, this,
             [this](std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path)
-            {
-                m_session = session; // NOLINT(performance-unnecessary-value-param)
-                m_vaultPath = path;  // NOLINT(performance-unnecessary-value-param)
-
-                if (m_dashboardView != nullptr)
-                {
-                    m_dashboardView->loadVault(m_session, m_vaultPath);
-                }
-
-                switchToDashboard();
-            });
+            { setActiveSession(std::move(session), std::move(path)); });
 
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     m_dashboardView = new DashboardView(m_service, this);
@@ -106,11 +100,9 @@ void MainWindow::setupUi()
                 }
             });
 
-    connect(m_dashboardView, &DashboardView::secretClicked,
-            [this](const std::string& key)
-            {
-                showSecretDialog(key);
-            });
+    connect(m_dashboardView, &DashboardView::secretClicked, [this](const std::string& key) { showSecretDialog(key); });
+
+    connect(m_dashboardView, &DashboardView::settingsClicked, this, &MainWindow::openSettings);
 
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     m_sessionTimer = new QTimer(this);
@@ -142,7 +134,7 @@ void MainWindow::updatePosition()
     QRect availableRect = screen->availableGeometry();
 
     int x{ availableRect.right() - width() - g_screenMargin };
-    int y{ availableRect.top() + g_screenMargin };
+    int y{ availableRect.bottom() - height() - g_screenMargin };
 
     this->move(x, y);
 
@@ -179,6 +171,84 @@ void MainWindow::switchToAddSecret()
     {
         m_stack->setCurrentIndex(2);
     }
+}
+
+void MainWindow::openSettings()
+{
+    if (m_settingsDialog == nullptr)
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        m_settingsDialog = new SettingsDialog(this);
+    }
+
+    m_settingsDialog->setSessionTimeoutSeconds(hepatizon::ui::readSessionTimeoutSeconds());
+    m_settingsDialog->setClipboardTimeoutMs(hepatizon::ui::readClipboardTimeoutMs());
+
+    if (m_settingsDialog->exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    const int timeoutSeconds = m_settingsDialog->sessionTimeoutSeconds();
+    const int clipboardTimeoutMs = m_settingsDialog->clipboardTimeoutMs();
+
+    hepatizon::ui::writeSessionTimeoutSeconds(timeoutSeconds);
+    hepatizon::ui::writeClipboardTimeoutMs(clipboardTimeoutMs);
+
+    if (m_session)
+    {
+        m_session->setTimeout(std::chrono::seconds{ timeoutSeconds });
+    }
+
+    if (m_secretDialog != nullptr)
+    {
+        m_secretDialog->setClipboardTimeoutMs(clipboardTimeoutMs);
+    }
+
+    auto newPasswordOpt = m_settingsDialog->takeNewPassword();
+    if (!newPasswordOpt)
+    {
+        return;
+    }
+
+    if (!m_session)
+    {
+        QMessageBox::warning(this, "No Vault", "Open a vault before changing the password.");
+        return;
+    }
+
+    auto vault = m_session->takeVault();
+    auto result = m_service.rekeyVault(m_vaultPath, std::move(vault), *newPasswordOpt);
+    hepatizon::security::secureRelease(*newPasswordOpt);
+
+    if (auto* newVault = std::get_if<hepatizon::core::UnlockedVault>(&result))
+    {
+        auto session =
+            std::make_shared<hepatizon::core::Session>(std::move(*newVault), std::chrono::seconds{ timeoutSeconds });
+        setActiveSession(std::move(session), m_vaultPath);
+        QMessageBox::information(this, "Password Updated", "Master password updated successfully.");
+        return;
+    }
+
+    lockVault("Password change failed. Vault locked.");
+}
+
+void MainWindow::setActiveSession(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path)
+{
+    m_session = std::move(session);
+    m_vaultPath = std::move(path);
+
+    if (m_dashboardView != nullptr)
+    {
+        m_dashboardView->loadVault(m_session, m_vaultPath);
+    }
+
+    if (m_addSecretView != nullptr)
+    {
+        m_addSecretView->setVaultContext(m_session, m_vaultPath);
+    }
+
+    switchToDashboard();
 }
 
 void MainWindow::setupTray()
@@ -274,8 +344,8 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
     const auto type = event->type();
     const bool shouldTouch = (type == QEvent::KeyPress) || (type == QEvent::MouseButtonPress) ||
-        (type == QEvent::Wheel) || (type == QEvent::TouchBegin) || (type == QEvent::TouchUpdate) ||
-        (type == QEvent::MouseMove);
+                             (type == QEvent::Wheel) || (type == QEvent::TouchBegin) || (type == QEvent::TouchUpdate) ||
+                             (type == QEvent::MouseMove);
 
     if (shouldTouch && m_session)
     {

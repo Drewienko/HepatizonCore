@@ -1,22 +1,22 @@
 #include "LoginView.hpp"
+#include "GuiSettings.hpp"
 #include "hepatizon/core/Session.hpp"
 #include "hepatizon/security/ScopeWipe.hpp"
 
 #include <QDir>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QStandardPaths>
-#include <QtGlobal>
 #include <QVBoxLayout>
+#include <QtGlobal>
 #include <chrono>
 
 namespace
 {
 constexpr int g_inputHeight = 40;
-constexpr auto g_defaultSessionTimeout = std::chrono::minutes{ 5 };
-
 std::filesystem::path toVaultPath(const QString& input)
 {
 #if defined(Q_OS_WIN)
@@ -25,7 +25,12 @@ std::filesystem::path toVaultPath(const QString& input)
     return std::filesystem::path{ input.toStdString() };
 #endif
 }
+
+std::chrono::seconds sessionTimeout()
+{
+    return std::chrono::seconds{ hepatizon::ui::readSessionTimeoutSeconds() };
 }
+} // namespace
 
 LoginView::LoginView(hepatizon::core::VaultService& service, QWidget* parent) : QWidget(parent), m_service(service)
 {
@@ -53,7 +58,7 @@ void LoginView::setupUi()
     QString docsPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     m_pathInput->setText(QDir(docsPath).filePath("HepatizonVault"));
 
-    auto* browseBtn = new QPushButton("...", this);
+    auto* browseBtn = new QPushButton(QIcon(":/icons/folder.svg"), "", this);
     browseBtn->setFixedSize(40, g_inputHeight);
     connect(browseBtn, &QPushButton::clicked, this, &LoginView::onBrowseClicked);
 
@@ -71,7 +76,7 @@ void LoginView::setupUi()
 
     connect(m_passInput, &QLineEdit::returnPressed, this, &LoginView::onUnlockClicked);
 
-    m_visibilityBtn = new QPushButton("👁", this);
+    m_visibilityBtn = new QPushButton(QIcon(":/icons/eye-off.svg"), "", this);
     m_visibilityBtn->setFixedSize(40, g_inputHeight);
     m_visibilityBtn->setCheckable(true);
     m_visibilityBtn->setCursor(Qt::PointingHandCursor);
@@ -84,8 +89,8 @@ void LoginView::setupUi()
     layout->addStretch();
 
     auto* btnLayout = new QHBoxLayout();
-    auto* createBtn = new QPushButton("CREATE NEW", this);
-    auto* unlockBtn = new QPushButton("UNLOCK", this);
+    auto* createBtn = new QPushButton(QIcon(":/icons/add.svg"), "CREATE NEW", this);
+    auto* unlockBtn = new QPushButton(QIcon(":/icons/key.svg"), "UNLOCK", this);
 
     unlockBtn->setObjectName("PrimaryButton");
     unlockBtn->setFixedHeight(45);
@@ -119,10 +124,12 @@ void LoginView::togglePasswordVisibility()
     if (m_visibilityBtn->isChecked())
     {
         m_passInput->setEchoMode(QLineEdit::Normal);
+        m_visibilityBtn->setIcon(QIcon(":/icons/eye.svg"));
     }
     else
     {
         m_passInput->setEchoMode(QLineEdit::Password);
+        m_visibilityBtn->setIcon(QIcon(":/icons/eye-off.svg"));
     }
 }
 
@@ -174,7 +181,7 @@ void LoginView::onUnlockClicked()
 
             if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&result))
             {
-                auto session = std::make_shared<hepatizon::core::Session>(std::move(*vault), g_defaultSessionTimeout);
+                auto session = std::make_shared<hepatizon::core::Session>(std::move(*vault), sessionTimeout());
                 emit vaultUnlocked(session, path);
             }
             else
@@ -225,8 +232,7 @@ void LoginView::onCreateClicked()
                 auto openRes = m_service.openVault(path, key);
                 if (auto* vault = std::get_if<hepatizon::core::UnlockedVault>(&openRes))
                 {
-                    auto session =
-                        std::make_shared<hepatizon::core::Session>(std::move(*vault), g_defaultSessionTimeout);
+                    auto session = std::make_shared<hepatizon::core::Session>(std::move(*vault), sessionTimeout());
                     emit vaultUnlocked(session, path);
                 }
                 else
