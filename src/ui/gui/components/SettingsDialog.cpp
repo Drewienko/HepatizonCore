@@ -1,5 +1,4 @@
 #include "SettingsDialog.hpp"
-#include "hepatizon/security/ScopeWipe.hpp"
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -15,6 +14,10 @@ constexpr int g_minutesPerHour = 60;
 constexpr int g_maxTimeoutMinutes = 12 * g_minutesPerHour;
 constexpr int g_maxClipboardSeconds = 300;
 constexpr int g_minClipboardSeconds = 5;
+constexpr int g_margin = 20;
+constexpr int g_spacing = 12;
+constexpr int g_timeoutScale = 60;
+constexpr int g_msScale = 1000;
 } // namespace
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
@@ -26,53 +29,53 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
 
 void SettingsDialog::setupUi()
 {
-    auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(20, 20, 20, 20);
-    mainLayout->setSpacing(12);
+    auto* mainLayout = new QVBoxLayout(this); // NOLINT(cppcoreguidelines-owning-memory)
+    mainLayout->setContentsMargins(g_margin, g_margin, g_margin, g_margin);
+    mainLayout->setSpacing(g_spacing);
 
-    auto* sessionBox = new QGroupBox("Auto-lock", this);
-    auto* sessionLayout = new QFormLayout(sessionBox);
+    auto* sessionBox = new QGroupBox("Auto-lock", this); // NOLINT(cppcoreguidelines-owning-memory)
+    auto* sessionLayout = new QFormLayout(sessionBox);   // NOLINT(cppcoreguidelines-owning-memory)
 
-    m_disableTimeout = new QCheckBox("Disable auto-lock", sessionBox);
+    m_disableTimeout = new QCheckBox("Disable auto-lock", sessionBox); // NOLINT(cppcoreguidelines-owning-memory)
     connect(m_disableTimeout, &QCheckBox::toggled, this, &SettingsDialog::onDisableTimeoutToggled);
     sessionLayout->addRow(m_disableTimeout);
 
-    m_timeoutMinutes = new QSpinBox(sessionBox);
+    m_timeoutMinutes = new QSpinBox(sessionBox); // NOLINT(cppcoreguidelines-owning-memory)
     m_timeoutMinutes->setRange(1, g_maxTimeoutMinutes);
     m_timeoutMinutes->setSuffix(" min");
     sessionLayout->addRow("Timeout:", m_timeoutMinutes);
 
     mainLayout->addWidget(sessionBox);
 
-    auto* clipboardBox = new QGroupBox("Clipboard", this);
-    auto* clipboardLayout = new QFormLayout(clipboardBox);
-    m_clipboardSeconds = new QSpinBox(clipboardBox);
+    auto* clipboardBox = new QGroupBox("Clipboard", this); // NOLINT(cppcoreguidelines-owning-memory)
+    auto* clipboardLayout = new QFormLayout(clipboardBox); // NOLINT(cppcoreguidelines-owning-memory)
+    m_clipboardSeconds = new QSpinBox(clipboardBox);       // NOLINT(cppcoreguidelines-owning-memory)
     m_clipboardSeconds->setRange(g_minClipboardSeconds, g_maxClipboardSeconds);
     m_clipboardSeconds->setSuffix(" sec");
     clipboardLayout->addRow("Auto-clear after:", m_clipboardSeconds);
     mainLayout->addWidget(clipboardBox);
 
-    auto* passwordBox = new QGroupBox("Change master password", this);
-    auto* passwordLayout = new QFormLayout(passwordBox);
+    auto* passwordBox = new QGroupBox("Change master password", this); // NOLINT(cppcoreguidelines-owning-memory)
+    auto* passwordLayout = new QFormLayout(passwordBox);               // NOLINT(cppcoreguidelines-owning-memory)
 
-    m_newPassword = new QLineEdit(passwordBox);
+    m_newPassword = new QLineEdit(passwordBox); // NOLINT(cppcoreguidelines-owning-memory)
     m_newPassword->setEchoMode(QLineEdit::Password);
 
-    m_confirmPassword = new QLineEdit(passwordBox);
+    m_confirmPassword = new QLineEdit(passwordBox); // NOLINT(cppcoreguidelines-owning-memory)
     m_confirmPassword->setEchoMode(QLineEdit::Password);
 
     passwordLayout->addRow("New password:", m_newPassword);
     passwordLayout->addRow("Confirm:", m_confirmPassword);
     mainLayout->addWidget(passwordBox);
 
-    auto* buttonsLayout = new QHBoxLayout();
+    auto* buttonsLayout = new QHBoxLayout(); // NOLINT(cppcoreguidelines-owning-memory)
     buttonsLayout->addStretch();
 
-    m_cancelButton = new QPushButton("Cancel", this);
+    m_cancelButton = new QPushButton("Cancel", this); // NOLINT(cppcoreguidelines-owning-memory)
     connect(m_cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     buttonsLayout->addWidget(m_cancelButton);
 
-    m_saveButton = new QPushButton("Save", this);
+    m_saveButton = new QPushButton("Save", this); // NOLINT(cppcoreguidelines-owning-memory)
     connect(m_saveButton, &QPushButton::clicked, this, &SettingsDialog::onSaveClicked);
     buttonsLayout->addWidget(m_saveButton);
 
@@ -107,12 +110,12 @@ int SettingsDialog::sessionTimeoutSeconds() const noexcept
     {
         return 0;
     }
-    return m_timeoutMinutes->value() * 60;
+    return m_timeoutMinutes->value() * g_timeoutScale;
 }
 
 int SettingsDialog::clipboardTimeoutMs() const noexcept
 {
-    return m_clipboardSeconds->value() * 1000;
+    return m_clipboardSeconds->value() * g_msScale;
 }
 
 std::optional<hepatizon::security::SecureString> SettingsDialog::takeNewPassword() noexcept

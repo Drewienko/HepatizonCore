@@ -14,6 +14,7 @@ namespace
 constexpr int g_defaultWidth = 360;
 constexpr int g_defaultHeight = 600;
 constexpr int g_screenMargin = 40;
+constexpr int g_checkIntervalMs = 1000;
 } // namespace
 
 MainWindow::MainWindow(hepatizon::core::VaultService& service) : m_service(service)
@@ -106,7 +107,7 @@ void MainWindow::setupUi()
 
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     m_sessionTimer = new QTimer(this);
-    m_sessionTimer->setInterval(1000);
+    m_sessionTimer->setInterval(g_checkIntervalMs);
     connect(m_sessionTimer, &QTimer::timeout,
             [this]()
             {

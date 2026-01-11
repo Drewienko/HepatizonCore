@@ -9,7 +9,7 @@
 int main(int argc, char* argv[])
 {
 #if defined(__linux__)
-    if (qEnvironmentVariableIsSet("QT_QPA_PLATFORM") == false)
+    if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM"))
     {
         qputenv("QT_QPA_PLATFORM", "xcb");
     }

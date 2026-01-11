@@ -1,6 +1,6 @@
 param(
-    [string]$BuildDir = "out/build/msvc-debug",
-    [string]$Config = "Debug",
+    [string]$BuildDir = "../out/build/windows-release-msvc",
+    [string]$Config = "Release",
     [string]$QtRoot = "C:/Qt/6.10.1/msvc2022_64"
 )
 
@@ -13,8 +13,9 @@ if (-not (Test-Path $windeployqt)) {
 }
 
 $exeCandidates = @(
+    (Join-Path $BuildDir "src/ui/$Config/hepatizoncore_gui.exe"),
+    (Join-Path $BuildDir "src/$Config/hepatizoncore_gui.exe"),
     (Join-Path $BuildDir "$Config/hepatizoncore_gui.exe")
-    (Join-Path $BuildDir "src/$Config/hepatizoncore_gui.exe")
 )
 $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exePath) {

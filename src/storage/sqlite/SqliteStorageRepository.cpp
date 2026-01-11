@@ -18,7 +18,7 @@
 #include <system_error>
 #include <vector>
 
-#if defined(_WIN32) && defined(HEPC_STORAGE_USE_SQLCIPHER)
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
 #include <sqlcipher/sqlite3.h>
 #else
 #include <sqlite3.h>
@@ -227,7 +227,30 @@ void exec(sqlite3* db, const char* sql)
     }
 }
 
-[[nodiscard]] SqliteDbPtr openDb(const std::filesystem::path& path, int flags)
+void maybeKeyDb(sqlite3* db, std::span<const std::byte> dbKey)
+{
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
+    if (dbKey.empty())
+    {
+        throw std::invalid_argument("storage: dbKey is required when SQLCipher is enabled");
+    }
+
+    const int rc{ sqlite3_key(db, static_cast<const void*>(dbKey.data()),
+                              checkedSqliteBytes(dbKey.size(), "storage: bad dbKey")) };
+    if (rc != SQLITE_OK)
+    {
+        throw std::runtime_error(sqliteErr(db, "storage: sqlite3_key failed"));
+    }
+
+    // Force an early failure on wrong keys (SQLITE_NOTADB, etc.).
+    exec(db, "SELECT count(*) FROM sqlite_master;");
+#else
+    (void)db;
+    (void)dbKey;
+#endif
+}
+
+[[nodiscard]] SqliteDbPtr openDb(const std::filesystem::path& path, int flags, std::span<const std::byte> dbKey)
 {
     if ((flags & SQLITE_OPEN_CREATE) == 0)
     {
@@ -246,6 +269,10 @@ void exec(sqlite3* db, const char* sql)
     {
         throw std::runtime_error(sqliteErr(raw, "storage: sqlite3_open_v2 failed"));
     }
+
+    // In non-SQLCipher builds this is a no-op, otherwise it keys the connection.
+    maybeKeyDb(db.get(), dbKey);
+
     return db;
 }
 
@@ -572,7 +599,8 @@ public:
         return true;
     }
 
-    void createVault(const std::filesystem::path& vaultDir, const hepatizon::storage::VaultInfo& info) override
+    void createVault(const std::filesystem::path& vaultDir, const hepatizon::storage::VaultInfo& info,
+                     std::span<const std::byte> dbKey) override
     {
         ensureEmptyDirOrCreate(vaultDir);
 
@@ -581,22 +609,23 @@ public:
 
         writeMetaFile(metaPath, info.kdf);
 
-        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, dbKey) };
         ensureSchema(db.get());
         upsertHeader(db.get(), info.encryptedHeader);
     }
 
-    [[nodiscard]] hepatizon::storage::VaultInfo loadVaultInfo(const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] hepatizon::crypto::KdfMetadata loadKdfMetadata(const std::filesystem::path& vaultDir) const override
     {
         const auto metaPath{ metaPathFor(vaultDir) };
+        return readMetaFile(metaPath);
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox loadEncryptedHeader(const std::filesystem::path& vaultDir,
+                                                                 std::span<const std::byte> dbKey) const override
+    {
         const auto dbPath{ dbPathFor(vaultDir) };
-
-        hepatizon::storage::VaultInfo info{};
-        info.kdf = readMetaFile(metaPath);
-
-        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
-        info.encryptedHeader = loadHeader(db.get());
-        return info;
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY, dbKey) };
+        return loadHeader(db.get());
     }
 
     void storeKdfMetadata(const std::filesystem::path& vaultDir, const hepatizon::crypto::KdfMetadata& kdf) override
@@ -613,44 +642,72 @@ public:
         writeMetaFile(metaPath, kdf);
     }
 
-    void storeEncryptedHeader(const std::filesystem::path& vaultDir,
-                              const hepatizon::crypto::AeadBox& encryptedHeader) override
+    void storeEncryptedHeader(const std::filesystem::path& vaultDir, const hepatizon::crypto::AeadBox& encryptedHeader,
+                              std::span<const std::byte> dbKey) override
     {
         const auto dbPath{ dbPathFor(vaultDir) };
-        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE, dbKey) };
         ensureSchema(db.get());
         upsertHeader(db.get(), encryptedHeader);
     }
 
-    void storeBlob(const std::filesystem::path& vaultDir, std::string_view key,
-                   const hepatizon::crypto::AeadBox& value) override
+    void rekeyDb(const std::filesystem::path& vaultDir, std::span<const std::byte> oldDbKey,
+                 std::span<const std::byte> newDbKey) override
+    {
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
+        const auto dbPath{ dbPathFor(vaultDir) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE, oldDbKey) };
+
+        if (newDbKey.empty())
+        {
+            throw std::invalid_argument("storage: newDbKey is required when SQLCipher is enabled");
+        }
+
+        const int rc{ sqlite3_rekey(db.get(), static_cast<const void*>(newDbKey.data()),
+                                    checkedSqliteBytes(newDbKey.size(), "storage: bad newDbKey")) };
+        if (rc != SQLITE_OK)
+        {
+            throw std::runtime_error(sqliteErr(db.get(), "storage: sqlite3_rekey failed"));
+        }
+#else
+        (void)vaultDir;
+        (void)oldDbKey;
+        (void)newDbKey;
+#endif
+    }
+
+    void storeBlob(const std::filesystem::path& vaultDir, std::string_view key, const hepatizon::crypto::AeadBox& value,
+                   std::span<const std::byte> dbKey) override
     {
         const auto dbPath{ dbPathFor(vaultDir) };
-        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE, dbKey) };
         ensureSchema(db.get());
         upsertBlob(db.get(), key, value);
     }
 
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox> loadBlob(const std::filesystem::path& vaultDir,
-                                                                     std::string_view key) const override
+                                                                     std::string_view key,
+                                                                     std::span<const std::byte> dbKey) const override
     {
         const auto dbPath{ dbPathFor(vaultDir) };
-        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY, dbKey) };
         return ::hepatizon::storage::sqlite::loadBlob(db.get(), key);
     }
 
-    [[nodiscard]] std::vector<std::string> listBlobKeys(const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] std::vector<std::string> listBlobKeys(const std::filesystem::path& vaultDir,
+                                                        std::span<const std::byte> dbKey) const override
     {
         const auto dbPath{ dbPathFor(vaultDir) };
-        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READONLY, dbKey) };
         ensureSchema(db.get());
         return ::hepatizon::storage::sqlite::listBlobKeys(db.get());
     }
 
-    [[nodiscard]] bool deleteBlob(const std::filesystem::path& vaultDir, std::string_view key) override
+    [[nodiscard]] bool deleteBlob(const std::filesystem::path& vaultDir, std::string_view key,
+                                  std::span<const std::byte> dbKey) override
     {
         const auto dbPath{ dbPathFor(vaultDir) };
-        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE) };
+        auto db{ openDb(dbPath, SQLITE_OPEN_READWRITE, dbKey) };
         ensureSchema(db.get());
         return ::hepatizon::storage::sqlite::deleteBlob(db.get(), key);
     }

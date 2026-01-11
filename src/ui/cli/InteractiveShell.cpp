@@ -71,6 +71,7 @@ void InteractiveShell::processLine(const std::string& line)
     app.require_subcommand(1);
 
     // HELP (Registered so it appears in the list, but 'hepc help' input is intercepted above)
+    // HELP
     app.add_subcommand("help", "Print this help message")->callback([]() { throw CLI::CallForHelp(); });
 
     // EXIT / QUIT

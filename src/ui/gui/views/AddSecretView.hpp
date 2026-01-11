@@ -25,7 +25,7 @@ private slots:
     void onSaveClicked();
     void onGenerateClicked();
 
-private:
+private: // NOLINT(readability-redundant-access-specifiers)
     void setupUi();
 
     hepatizon::core::VaultService& m_service;

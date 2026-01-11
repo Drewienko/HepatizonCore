@@ -4,7 +4,7 @@ namespace hepatizon::core
 {
 
 Session::Session(UnlockedVault&& vault, Duration timeout, NowProvider nowProvider)
-    : m_now(std::move(nowProvider)), m_timeout(timeout), m_lastActivity{}, m_vault(std::move(vault))
+    : m_now(std::move(nowProvider)), m_timeout(timeout), m_vault(std::move(vault))
 {
     m_lastActivity = m_now();
 }

@@ -28,7 +28,7 @@ private slots:
     void onDisableTimeoutToggled(bool checked);
     void onSaveClicked();
 
-private:
+private: // NOLINT(readability-redundant-access-specifiers)
     void setupUi();
     void clearPasswordFields();
 
@@ -40,7 +40,7 @@ private:
     QPushButton* m_saveButton{ nullptr };
     QPushButton* m_cancelButton{ nullptr };
 
-    std::optional<hepatizon::security::SecureString> m_pendingPassword{};
+    std::optional<hepatizon::security::SecureString> m_pendingPassword;
 };
 
 #endif // HEPATIZON_SETTINGS_DIALOG_HPP

@@ -1,0 +1,124 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Release Linux
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.10"
+
+    - name: Install system tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build pkg-config qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+
+    - name: Export Qt prefix
+      run: echo "QT6_PREFIX=/usr" >> "$GITHUB_ENV"
+
+    - name: Setup Vcpkg
+      run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+    - name: Configure
+      run: cmake --preset linux-release-gcc-openssl
+
+    - name: Build
+      run: cmake --build --preset linux-release-gcc-openssl
+
+    - name: Package
+      run: |
+        buildDir="out/build/linux-release-gcc-openssl"
+        releaseDir="release_pkg"
+        mkdir -p $releaseDir
+        
+        cp "$buildDir/src/ui/hepatizoncore_gui" "$releaseDir/"
+        cp "$buildDir/src/ui/hepatizoncore_cli" "$releaseDir/"
+        
+        cp README-linux.txt "$releaseDir/"
+        cp ThirdPartyNotices.txt "$releaseDir/"
+        cp lgpl-3.0.txt "$releaseDir/"
+        cp apache-2.0.txt "$releaseDir/"
+
+        cd $releaseDir
+        zip -r ../hepatizoncore-linux-x64.zip .
+
+    - name: Upload
+      uses: softprops/action-gh-release@v1
+      with:
+        files: hepatizoncore-linux-x64.zip
+
+  windows:
+    name: Release Windows
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: "3.31.10"
+
+    - name: Setup Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: "6.8.2"
+        arch: win64_msvc2022_64
+        cache: 'false'
+
+    - name: Export Qt prefix
+      shell: pwsh
+      run: |
+        "QT6_PREFIX=$env:Qt6_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: Setup Vcpkg
+      shell: bash
+      run: ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+    - name: Configure
+      run: cmake --preset windows-release-msvc
+
+    - name: Build
+      run: cmake --build --preset windows-release-msvc
+
+    - name: Package
+      run: |
+        $buildDir = "out/build/windows-release-msvc"
+        $releaseDir = "release_pkg"
+        New-Item -ItemType Directory -Force -Path $releaseDir
+        
+        Copy-Item "$buildDir/src/ui/Release/hepatizoncore_gui.exe" -Destination $releaseDir
+        Copy-Item "$buildDir/src/ui/Release/hepatizoncore_cli.exe" -Destination $releaseDir
+        
+        Copy-Item "README-win.txt" -Destination $releaseDir
+        Copy-Item "ThirdPartyNotices.txt" -Destination $releaseDir
+        Copy-Item "lgpl-3.0.txt" -Destination $releaseDir
+        Copy-Item "apache-2.0.txt" -Destination $releaseDir
+
+        Copy-Item "$buildDir/vcpkg_installed/x64-windows/bin/*.dll" -Destination $releaseDir
+
+        windeployqt --release --no-translations --no-compiler-runtime --dir $releaseDir "$releaseDir/hepatizoncore_gui.exe"
+        
+        Compress-Archive -Path "$releaseDir/*" -DestinationPath "hepatizoncore-windows-x64.zip"
+
+    - name: Upload
+      uses: softprops/action-gh-release@v1
+      with:
+        files: hepatizoncore-windows-x64.zip

@@ -11,7 +11,7 @@ target_link_libraries(hepatizon_storage_sqlite
         hepatizon_adapters_headers
 )
 
-if(WIN32 AND HEPC_STORAGE_USE_SQLCIPHER)
+if(HEPC_STORAGE_USE_SQLCIPHER)
     find_package(sqlcipher CONFIG REQUIRED)
     target_compile_definitions(hepatizon_storage_sqlite PRIVATE HEPC_STORAGE_USE_SQLCIPHER=1)
     target_link_libraries(hepatizon_storage_sqlite PRIVATE sqlcipher::sqlcipher)

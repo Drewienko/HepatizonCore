@@ -36,7 +36,7 @@ public:
 private:
     NowProvider m_now;
     Duration m_timeout{};
-    TimePoint m_lastActivity{};
+    TimePoint m_lastActivity;
     UnlockedVault m_vault;
 };
 

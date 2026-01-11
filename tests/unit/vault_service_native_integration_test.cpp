@@ -133,12 +133,12 @@ TEST(VaultService, MigratesV1HeaderToV2AndRekeysWithoutTouchingBlobs_NativeProvi
     const auto keyChars{ std::span<const char>{ "k", 1 } };
     const auto aadForBlob{ std::as_bytes(keyChars) };
     const auto blobBox{ crypto->aeadEncrypt(legacySecretsKey, hepatizon::security::asBytes(plainText), aadForBlob) };
-    storage->storeBlob(dir, "k", blobBox);
+    storage->storeBlob(dir, "k", blobBox, hepatizon::security::asBytes(unlocked0.dbKey()));
     wipePlainText.release();
     hepatizon::security::secureRelease(plainText);
     hepatizon::security::secureRelease(legacySecretsKey);
 
-    const auto blobBefore{ storage->loadBlob(dir, "k") };
+    const auto blobBefore{ storage->loadBlob(dir, "k", hepatizon::security::asBytes(unlocked0.dbKey())) };
     ASSERT_TRUE(blobBefore.has_value());
 
     auto v1Header{ unlocked0.header() };
@@ -148,7 +148,7 @@ TEST(VaultService, MigratesV1HeaderToV2AndRekeysWithoutTouchingBlobs_NativeProvi
     const auto encryptedV1{ crypto->aeadEncrypt(unlocked0.headerKey(),
                                                 std::span<const std::byte>{ plainV1.data(), plainV1.size() },
                                                 std::span<const std::byte>{ aad.data(), aad.size() }) };
-    storage->storeEncryptedHeader(dir, encryptedV1);
+    storage->storeEncryptedHeader(dir, encryptedV1, hepatizon::security::asBytes(unlocked0.dbKey()));
 
     auto password2{ hepatizon::security::secureStringFrom("password") };
     auto wipePassword2{ hepatizon::security::scopeWipe(password2) };
@@ -159,7 +159,7 @@ TEST(VaultService, MigratesV1HeaderToV2AndRekeysWithoutTouchingBlobs_NativeProvi
     auto unlockedAfter{ std::get<hepatizon::core::UnlockedVault>(std::move(unlockedAfterOrErr)) };
     EXPECT_EQ(unlockedAfter.header().headerVersion, hepatizon::core::g_vaultHeaderVersionV2);
 
-    const auto blobAfterMigration{ storage->loadBlob(dir, "k") };
+    const auto blobAfterMigration{ storage->loadBlob(dir, "k", hepatizon::security::asBytes(unlockedAfter.dbKey())) };
     ASSERT_TRUE(blobAfterMigration.has_value());
     EXPECT_EQ(blobAfterMigration->nonce, blobBefore->nonce);
     EXPECT_EQ(blobAfterMigration->tag, blobBefore->tag);
@@ -167,11 +167,12 @@ TEST(VaultService, MigratesV1HeaderToV2AndRekeysWithoutTouchingBlobs_NativeProvi
 
     auto newPassword{ hepatizon::security::secureStringFrom("new-password") };
     auto wipeNewPassword{ hepatizon::security::scopeWipe(newPassword) };
-    const auto rekeyedOrErr{ service.rekeyVault(dir, std::move(unlockedAfter), newPassword) };
+    auto rekeyedOrErr{ service.rekeyVault(dir, std::move(unlockedAfter), newPassword) };
     wipeNewPassword.release();
     ASSERT_TRUE(std::holds_alternative<hepatizon::core::UnlockedVault>(rekeyedOrErr));
+    auto rekeyed{ std::get<hepatizon::core::UnlockedVault>(std::move(rekeyedOrErr)) };
 
-    const auto blobAfterRekey{ storage->loadBlob(dir, "k") };
+    const auto blobAfterRekey{ storage->loadBlob(dir, "k", hepatizon::security::asBytes(rekeyed.dbKey())) };
     ASSERT_TRUE(blobAfterRekey.has_value());
     EXPECT_EQ(blobAfterRekey->nonce, blobBefore->nonce);
     EXPECT_EQ(blobAfterRekey->tag, blobBefore->tag);

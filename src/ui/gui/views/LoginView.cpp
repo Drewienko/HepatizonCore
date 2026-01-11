@@ -1,7 +1,6 @@
 #include "LoginView.hpp"
 #include "GuiSettings.hpp"
 #include "hepatizon/core/Session.hpp"
-#include "hepatizon/security/ScopeWipe.hpp"
 
 #include <QDir>
 #include <QFileDialog>
@@ -17,6 +16,12 @@
 namespace
 {
 constexpr int g_inputHeight = 40;
+constexpr int g_marginH = 30;
+constexpr int g_marginV = 40;
+constexpr int g_spacing = 15;
+constexpr int g_btnHeight = 45;
+constexpr int g_passSpacing = 5;
+constexpr int g_iconBtnWidth = 40;
 std::filesystem::path toVaultPath(const QString& input)
 {
 #if defined(Q_OS_WIN)
@@ -40,44 +45,45 @@ LoginView::LoginView(hepatizon::core::VaultService& service, QWidget* parent) : 
 void LoginView::setupUi()
 {
 
-    auto* layout = new QVBoxLayout(this);
-    layout->setSpacing(15);
-    layout->setContentsMargins(30, 40, 30, 30);
+    auto* layout = new QVBoxLayout(this); // NOLINT(cppcoreguidelines-owning-memory)
+    layout->setSpacing(g_spacing);
+    layout->setContentsMargins(g_marginH, g_marginV, g_marginH, g_marginH);
 
-    auto* logoLabel = new QLabel("HEPATIZON", this);
+    auto* logoLabel = new QLabel("HEPATIZON", this); // NOLINT(cppcoreguidelines-owning-memory)
     logoLabel->setAlignment(Qt::AlignCenter);
     logoLabel->setStyleSheet(
         "font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #F5D163; margin-bottom: 20px;");
     layout->addWidget(logoLabel);
 
-    auto* pathLayout = new QHBoxLayout();
-    m_pathInput = new QLineEdit(this);
+    auto* pathLayout = new QHBoxLayout(); // NOLINT(cppcoreguidelines-owning-memory)
+    m_pathInput = new QLineEdit(this);    // NOLINT(cppcoreguidelines-owning-memory)
     m_pathInput->setPlaceholderText("Vault directory");
     m_pathInput->setFixedHeight(g_inputHeight);
 
     QString docsPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     m_pathInput->setText(QDir(docsPath).filePath("HepatizonVault"));
 
-    auto* browseBtn = new QPushButton(QIcon(":/icons/folder.svg"), "", this);
-    browseBtn->setFixedSize(40, g_inputHeight);
+    auto* browseBtn = new QPushButton(QIcon(":/icons/folder.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    browseBtn->setFixedSize(g_iconBtnWidth, g_inputHeight);
     connect(browseBtn, &QPushButton::clicked, this, &LoginView::onBrowseClicked);
 
     pathLayout->addWidget(m_pathInput);
     pathLayout->addWidget(browseBtn);
     layout->addLayout(pathLayout);
 
-    auto* passLayout = new QHBoxLayout();
-    passLayout->setSpacing(5);
+    auto* passLayout = new QHBoxLayout(); // NOLINT(cppcoreguidelines-owning-memory)
+    passLayout->setSpacing(g_passSpacing);
 
-    m_passInput = new QLineEdit(this);
+    m_passInput = new QLineEdit(this); // NOLINT(cppcoreguidelines-owning-memory)
     m_passInput->setPlaceholderText("Master Password");
     m_passInput->setEchoMode(QLineEdit::Password);
     m_passInput->setFixedHeight(g_inputHeight);
 
     connect(m_passInput, &QLineEdit::returnPressed, this, &LoginView::onUnlockClicked);
 
-    m_visibilityBtn = new QPushButton(QIcon(":/icons/eye-off.svg"), "", this);
-    m_visibilityBtn->setFixedSize(40, g_inputHeight);
+    m_visibilityBtn =                                            // NOLINT(cppcoreguidelines-owning-memory)
+        new QPushButton(QIcon(":/icons/eye-off.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    m_visibilityBtn->setFixedSize(g_iconBtnWidth, g_inputHeight);
     m_visibilityBtn->setCheckable(true);
     m_visibilityBtn->setCursor(Qt::PointingHandCursor);
     connect(m_visibilityBtn, &QPushButton::toggled, this, &LoginView::togglePasswordVisibility);
@@ -88,13 +94,15 @@ void LoginView::setupUi()
 
     layout->addStretch();
 
-    auto* btnLayout = new QHBoxLayout();
-    auto* createBtn = new QPushButton(QIcon(":/icons/add.svg"), "CREATE NEW", this);
-    auto* unlockBtn = new QPushButton(QIcon(":/icons/key.svg"), "UNLOCK", this);
+    auto* btnLayout = new QHBoxLayout(); // NOLINT(cppcoreguidelines-owning-memory)
+    auto* createBtn =
+        new QPushButton(QIcon(":/icons/add.svg"), "CREATE NEW", this); // NOLINT(cppcoreguidelines-owning-memory)
+    auto* unlockBtn =
+        new QPushButton(QIcon(":/icons/key.svg"), "UNLOCK", this); // NOLINT(cppcoreguidelines-owning-memory)
 
     unlockBtn->setObjectName("PrimaryButton");
-    unlockBtn->setFixedHeight(45);
-    createBtn->setFixedHeight(45);
+    unlockBtn->setFixedHeight(g_btnHeight);
+    createBtn->setFixedHeight(g_btnHeight);
 
     connect(createBtn, &QPushButton::clicked, this, &LoginView::onCreateClicked);
     connect(unlockBtn, &QPushButton::clicked, this, &LoginView::onUnlockClicked);

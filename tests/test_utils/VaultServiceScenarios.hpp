@@ -209,8 +209,10 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
     // AEAD authentication should fail if AAD does not match (empty AAD here).
     try
     {
-        const auto storedInfo{ storage->loadVaultInfo(cleanup.dir()) };
-        const auto wrongAad{ crypto.aeadDecrypt(unlocked.headerKey(), storedInfo.encryptedHeader, {}) };
+        const auto storedHeader{
+            storage->loadEncryptedHeader(cleanup.dir(), hepatizon::security::asBytes(unlocked.dbKey()))
+        };
+        const auto wrongAad{ crypto.aeadDecrypt(unlocked.headerKey(), storedHeader, {}) };
         if (wrongAad.has_value())
         {
             ADD_FAILURE() << "decrypting with wrong AAD unexpectedly succeeded";
@@ -387,7 +389,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
     {
-        storage->storeEncryptedHeader(cleanup.dir(), encrypted);
+        storage->storeEncryptedHeader(cleanup.dir(), encrypted, hepatizon::security::asBytes(unlocked.dbKey()));
     }
     catch (...)
     {
@@ -451,7 +453,7 @@ unlockVaultOrResult(hepatizon::core::VaultService& service, const std::filesyste
                                              std::span<const std::byte>{ aad.data(), aad.size() }) };
     try
     {
-        storage->storeEncryptedHeader(cleanup.dir(), encrypted);
+        storage->storeEncryptedHeader(cleanup.dir(), encrypted, hepatizon::security::asBytes(unlocked.dbKey()));
     }
     catch (...)
     {

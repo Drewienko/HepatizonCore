@@ -43,7 +43,7 @@ encodeVaultHeaderV2(const VaultHeader& header, std::span<const std::uint8_t> sec
 
 // Decodes a V2 payload into a header and an out-parameter secrets key.
 [[nodiscard]] bool decodeVaultHeaderV2(std::span<const std::byte> bytes, VaultHeader& outHeader,
-                                      std::span<std::uint8_t> outSecretsKey) noexcept;
+                                       std::span<std::uint8_t> outSecretsKey) noexcept;
 
 } // namespace hepatizon::core
 

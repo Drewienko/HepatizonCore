@@ -58,11 +58,11 @@ public:
     UnlockedVault() = default;
     UnlockedVault(const UnlockedVault&) = delete;
     UnlockedVault& operator=(const UnlockedVault&) = delete;
-    UnlockedVault(UnlockedVault&& other) noexcept
-        : m_kdf(other.m_kdf), m_header(other.m_header), m_headerKey{}, m_secretsKey{}
+    UnlockedVault(UnlockedVault&& other) noexcept : m_kdf(other.m_kdf), m_header(other.m_header)
     {
         m_headerKey.swap(other.m_headerKey);
         m_secretsKey.swap(other.m_secretsKey);
+        m_dbKey.swap(other.m_dbKey);
         other.m_kdf = {};
         other.m_header = {};
     }
@@ -79,8 +79,10 @@ public:
 
         hepatizon::security::secureRelease(m_headerKey);
         hepatizon::security::secureRelease(m_secretsKey);
+        hepatizon::security::secureRelease(m_dbKey);
         m_headerKey.swap(other.m_headerKey);
         m_secretsKey.swap(other.m_secretsKey);
+        m_dbKey.swap(other.m_dbKey);
 
         other.m_kdf = {};
         other.m_header = {};
@@ -91,11 +93,13 @@ public:
     {
         hepatizon::security::secureRelease(m_headerKey);
         hepatizon::security::secureRelease(m_secretsKey);
+        hepatizon::security::secureRelease(m_dbKey);
     }
 
     UnlockedVault(hepatizon::crypto::KdfMetadata kdf, VaultHeader header, hepatizon::security::SecureBuffer headerKey,
-                  hepatizon::security::SecureBuffer secretsKey) noexcept
-        : m_kdf(kdf), m_header(header), m_headerKey(std::move(headerKey)), m_secretsKey(std::move(secretsKey))
+                  hepatizon::security::SecureBuffer secretsKey, hepatizon::security::SecureBuffer dbKey) noexcept
+        : m_kdf(kdf), m_header(header), m_headerKey(std::move(headerKey)), m_secretsKey(std::move(secretsKey)),
+          m_dbKey(std::move(dbKey))
     {
     }
 
@@ -117,6 +121,11 @@ public:
         return m_secretsKey;
     }
 
+    [[nodiscard]] const hepatizon::security::SecureBuffer& dbKey() const noexcept
+    {
+        return m_dbKey;
+    }
+
     [[nodiscard]] hepatizon::security::SecureBuffer takeSecretsKey() noexcept
     {
         hepatizon::security::SecureBuffer out{};
@@ -129,6 +138,7 @@ private:
     VaultHeader m_header{};
     hepatizon::security::SecureBuffer m_headerKey;
     hepatizon::security::SecureBuffer m_secretsKey;
+    hepatizon::security::SecureBuffer m_dbKey;
 };
 
 class VaultService final

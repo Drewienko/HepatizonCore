@@ -95,6 +95,7 @@ vcpkg_installed/
 coverage-report/
 build_coverage/
 # Personal project notes (not tracked)
+STRUCTURE.md
 AGENTS.md
 NOTES.md
 RESEARCH.md

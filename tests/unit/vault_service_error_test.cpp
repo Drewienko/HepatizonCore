@@ -233,13 +233,14 @@ public:
     }
 
     void createVault([[maybe_unused]] const std::filesystem::path& vaultDir,
-                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info) override
+                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info,
+                     [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
-    [[nodiscard]] hepatizon::storage::VaultInfo
-    loadVaultInfo([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] hepatizon::crypto::KdfMetadata
+    loadKdfMetadata([[maybe_unused]] const std::filesystem::path& vaultDir) const override
     {
         if (m_mode == LoadMode::ThrowsNotFound)
         {
@@ -249,7 +250,7 @@ public:
         {
             throw std::runtime_error{ "storage failure" };
         }
-        return m_info;
+        return m_info.kdf;
     }
 
     void storeKdfMetadata([[maybe_unused]] const std::filesystem::path& vaultDir,
@@ -259,32 +260,58 @@ public:
     }
 
     void storeEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
-                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader) override
+                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader,
+                              [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
-        throw std::runtime_error{ "not implemented" };
     }
 
     void storeBlob([[maybe_unused]] const std::filesystem::path& vaultDir, [[maybe_unused]] std::string_view key,
-                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value) override
+                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value,
+                   [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox>
     loadBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-             [[maybe_unused]] std::string_view key) const override
+             [[maybe_unused]] std::string_view key,
+             [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::vector<std::string>
-    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] bool deleteBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-                                  [[maybe_unused]] std::string_view key) override
+                                  [[maybe_unused]] std::string_view key,
+                                  [[maybe_unused]] std::span<const std::byte> dbKey) override
+    {
+        throw std::runtime_error{ "not implemented" };
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox
+    loadEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
+                        [[maybe_unused]] std::span<const std::byte> dbKey) const override
+    {
+        if (m_mode == LoadMode::ThrowsNotFound)
+        {
+            throw hepatizon::storage::VaultNotFound{ "vault not found" };
+        }
+        if (m_mode == LoadMode::ThrowsOther)
+        {
+            throw std::runtime_error{ "storage failure" };
+        }
+        return m_info.encryptedHeader;
+    }
+
+    void rekeyDb([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> oldDbKey,
+                 [[maybe_unused]] std::span<const std::byte> newDbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
@@ -303,13 +330,14 @@ public:
     }
 
     void createVault([[maybe_unused]] const std::filesystem::path& vaultDir,
-                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info) override
+                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info,
+                     [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
-    [[nodiscard]] hepatizon::storage::VaultInfo
-    loadVaultInfo([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] hepatizon::crypto::KdfMetadata
+    loadKdfMetadata([[maybe_unused]] const std::filesystem::path& vaultDir) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
@@ -321,32 +349,51 @@ public:
     }
 
     void storeEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
-                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader) override
+                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader,
+                              [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     void storeBlob([[maybe_unused]] const std::filesystem::path& vaultDir, [[maybe_unused]] std::string_view key,
-                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value) override
+                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value,
+                   [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox>
     loadBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-             [[maybe_unused]] std::string_view key) const override
+             [[maybe_unused]] std::string_view key,
+             [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::vector<std::string>
-    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] bool deleteBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-                                  [[maybe_unused]] std::string_view key) override
+                                  [[maybe_unused]] std::string_view key,
+                                  [[maybe_unused]] std::span<const std::byte> dbKey) override
+    {
+        throw std::runtime_error{ "not implemented" };
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox
+    loadEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
+                        [[maybe_unused]] std::span<const std::byte> dbKey) const override
+    {
+        throw std::runtime_error{ "not implemented" };
+    }
+
+    void rekeyDb([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> oldDbKey,
+                 [[maybe_unused]] std::span<const std::byte> newDbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
@@ -378,13 +425,14 @@ public:
     }
 
     void createVault([[maybe_unused]] const std::filesystem::path& vaultDir,
-                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info) override
+                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info,
+                     [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
-    [[nodiscard]] hepatizon::storage::VaultInfo
-    loadVaultInfo([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] hepatizon::crypto::KdfMetadata
+    loadKdfMetadata([[maybe_unused]] const std::filesystem::path& vaultDir) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
@@ -400,7 +448,8 @@ public:
     }
 
     void storeEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
-                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader) override
+                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader,
+                              [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         if (m_mode == RekeyStoreMode::NotFoundOnStoreHeader)
         {
@@ -413,28 +462,45 @@ public:
     }
 
     void storeBlob([[maybe_unused]] const std::filesystem::path& vaultDir, [[maybe_unused]] std::string_view key,
-                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value) override
+                   [[maybe_unused]] const hepatizon::crypto::AeadBox& value,
+                   [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox>
     loadBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-             [[maybe_unused]] std::string_view key) const override
+             [[maybe_unused]] std::string_view key,
+             [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] std::vector<std::string>
-    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     [[nodiscard]] bool deleteBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-                                  [[maybe_unused]] std::string_view key) override
+                                  [[maybe_unused]] std::string_view key,
+                                  [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox
+    loadEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
+                        [[maybe_unused]] std::span<const std::byte> dbKey) const override
+    {
+        throw std::runtime_error{ "not implemented" };
+    }
+
+    void rekeyDb([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> oldDbKey,
+                 [[maybe_unused]] std::span<const std::byte> newDbKey) override
+    {
     }
 
 private:
@@ -600,7 +666,10 @@ TEST(VaultService, RekeyVaultMapsEncryptFailureToCryptoError)
     headerKey.resize(hepatizon::crypto::g_aeadKeyBytes);
     hepatizon::security::SecureBuffer secretsKey{};
     secretsKey.resize(hepatizon::core::g_vaultSecretsKeyBytes);
-    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey) };
+    hepatizon::security::SecureBuffer dbKey{};
+    dbKey.resize(hepatizon::crypto::g_aeadKeyBytes);
+    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey),
+                                             std::move(dbKey) };
 
     const auto newPassword{ hepatizon::security::secureStringFrom("new") };
     const auto result{ service.rekeyVault("any", std::move(unlocked), newPassword,
@@ -622,7 +691,10 @@ TEST(VaultService, RekeyVaultMapsVaultNotFoundToNotFound)
     headerKey.resize(hepatizon::crypto::g_aeadKeyBytes);
     hepatizon::security::SecureBuffer secretsKey{};
     secretsKey.resize(hepatizon::core::g_vaultSecretsKeyBytes);
-    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey) };
+    hepatizon::security::SecureBuffer dbKey{};
+    dbKey.resize(hepatizon::crypto::g_aeadKeyBytes);
+    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey),
+                                             std::move(dbKey) };
 
     const auto newPassword{ hepatizon::security::secureStringFrom("new") };
     const auto result{ service.rekeyVault("any", std::move(unlocked), newPassword,
@@ -644,7 +716,10 @@ TEST(VaultService, RekeyVaultRollsBackKdfMetadataOnStorageError)
     headerKey.resize(hepatizon::crypto::g_aeadKeyBytes);
     hepatizon::security::SecureBuffer secretsKey{};
     secretsKey.resize(hepatizon::core::g_vaultSecretsKeyBytes);
-    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey) };
+    hepatizon::security::SecureBuffer dbKey{};
+    dbKey.resize(hepatizon::crypto::g_aeadKeyBytes);
+    hepatizon::core::UnlockedVault unlocked{ oldMeta, header, std::move(headerKey), std::move(secretsKey),
+                                             std::move(dbKey) };
 
     const auto newPassword{ hepatizon::security::secureStringFrom("new") };
     const auto result{ service.rekeyVault("any", std::move(unlocked), newPassword,
@@ -813,13 +888,14 @@ public:
     }
 
     void createVault([[maybe_unused]] const std::filesystem::path& vaultDir,
-                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info) override
+                     [[maybe_unused]] const hepatizon::storage::VaultInfo& info,
+                     [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
-    [[nodiscard]] hepatizon::storage::VaultInfo
-    loadVaultInfo([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    [[nodiscard]] hepatizon::crypto::KdfMetadata
+    loadKdfMetadata([[maybe_unused]] const std::filesystem::path& vaultDir) const override
     {
         throw std::runtime_error{ "not implemented" };
     }
@@ -831,13 +907,15 @@ public:
     }
 
     void storeEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
-                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader) override
+                              [[maybe_unused]] const hepatizon::crypto::AeadBox& encryptedHeader,
+                              [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         throw std::runtime_error{ "not implemented" };
     }
 
     void storeBlob([[maybe_unused]] const std::filesystem::path& vaultDir, [[maybe_unused]] std::string_view key,
-                   const hepatizon::crypto::AeadBox& value) override
+                   const hepatizon::crypto::AeadBox& value,
+                   [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         if (m_storeBlobMode == StoreBlobMode::Throws)
         {
@@ -848,7 +926,8 @@ public:
 
     [[nodiscard]] std::optional<hepatizon::crypto::AeadBox>
     loadBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-             [[maybe_unused]] std::string_view key) const override
+             [[maybe_unused]] std::string_view key,
+             [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         if (m_loadBlobMode == LoadBlobMode::Throws)
         {
@@ -862,7 +941,8 @@ public:
     }
 
     [[nodiscard]] std::vector<std::string>
-    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir) const override
+    listBlobKeys([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> dbKey) const override
     {
         if (m_listKeysMode == ListKeysMode::ThrowsNotFound)
         {
@@ -876,7 +956,8 @@ public:
     }
 
     [[nodiscard]] bool deleteBlob([[maybe_unused]] const std::filesystem::path& vaultDir,
-                                  [[maybe_unused]] std::string_view key) override
+                                  [[maybe_unused]] std::string_view key,
+                                  [[maybe_unused]] std::span<const std::byte> dbKey) override
     {
         if (m_deleteBlobMode == DeleteBlobMode::ThrowsNotFound)
         {
@@ -887,6 +968,20 @@ public:
             throw std::runtime_error{ "deleteBlob failed" };
         }
         return m_deleteBlobMode == DeleteBlobMode::ReturnsTrue;
+    }
+
+    [[nodiscard]] hepatizon::crypto::AeadBox
+    loadEncryptedHeader([[maybe_unused]] const std::filesystem::path& vaultDir,
+                        [[maybe_unused]] std::span<const std::byte> dbKey) const override
+    {
+        throw std::runtime_error{ "not implemented" };
+    }
+
+    void rekeyDb([[maybe_unused]] const std::filesystem::path& vaultDir,
+                 [[maybe_unused]] std::span<const std::byte> oldDbKey,
+                 [[maybe_unused]] std::span<const std::byte> newDbKey) override
+    {
+        throw std::runtime_error{ "not implemented" };
     }
 
 private:
@@ -908,7 +1003,10 @@ private:
     hepatizon::security::SecureBuffer secretsKey{};
     secretsKey.resize(hepatizon::core::g_vaultSecretsKeyBytes);
 
-    return hepatizon::core::UnlockedVault{ meta, header, std::move(headerKey), std::move(secretsKey) };
+    hepatizon::security::SecureBuffer dbKey{};
+    dbKey.resize(hepatizon::crypto::g_aeadKeyBytes);
+
+    return hepatizon::core::UnlockedVault{ meta, header, std::move(headerKey), std::move(secretsKey), std::move(dbKey) };
 }
 
 TEST(VaultService, PutSecretRejectsEmptyKey)

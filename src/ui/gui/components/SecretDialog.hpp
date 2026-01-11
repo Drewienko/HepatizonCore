@@ -21,7 +21,7 @@ private slots:
     void onToggleReveal(bool checked);
     void clearClipboardIfUnchanged();
 
-private:
+private: // NOLINT(readability-redundant-access-specifiers)
     void clearSensitiveFields();
 
     QLabel* m_keyLabel{ nullptr };

@@ -14,7 +14,9 @@ template <class T> struct ZeroAllocator
 {
     ZeroAllocator() noexcept = default;
 
-    template <class U> constexpr explicit ZeroAllocator([[maybe_unused]] const ZeroAllocator<U>&) noexcept {}
+    template <class U> constexpr explicit ZeroAllocator([[maybe_unused]] const ZeroAllocator<U>& other) noexcept
+    {
+    }
 
     using value_type = T;
     using is_always_equal = std::true_type;

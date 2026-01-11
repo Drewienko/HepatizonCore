@@ -103,6 +103,9 @@ if(GTest_FOUND)
         )
 
         add_test(NAME hepatizon_gui_tests COMMAND hepatizon_gui_tests)
+        set_tests_properties(hepatizon_gui_tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        )
         hepc_set_common_warnings(hepatizon_gui_tests)
     endif()
 else()

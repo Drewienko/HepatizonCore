@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
-#if defined(_WIN32) && defined(HEPC_STORAGE_USE_SQLCIPHER)
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
 #include <sqlcipher/sqlite3.h>
 #else
 #include <sqlite3.h>
@@ -18,6 +18,20 @@
 
 namespace
 {
+
+constexpr std::array<std::byte, 32> g_kTestDbKey{
+    std::byte{ 0x01 }, std::byte{ 0x02 }, std::byte{ 0x03 }, std::byte{ 0x04 }, std::byte{ 0x05 }, std::byte{ 0x06 },
+    std::byte{ 0x07 }, std::byte{ 0x08 }, std::byte{ 0x09 }, std::byte{ 0x0A }, std::byte{ 0x0B }, std::byte{ 0x0C },
+    std::byte{ 0x0D }, std::byte{ 0x0E }, std::byte{ 0x0F }, std::byte{ 0x10 }, std::byte{ 0x11 }, std::byte{ 0x12 },
+    std::byte{ 0x13 }, std::byte{ 0x14 }, std::byte{ 0x15 }, std::byte{ 0x16 }, std::byte{ 0x17 }, std::byte{ 0x18 },
+    std::byte{ 0x19 }, std::byte{ 0x1A }, std::byte{ 0x1B }, std::byte{ 0x1C }, std::byte{ 0x1D }, std::byte{ 0x1E },
+    std::byte{ 0x1F }, std::byte{ 0x20 }
+};
+
+[[nodiscard]] std::span<const std::byte> testDbKey() noexcept
+{
+    return std::span<const std::byte>{ g_kTestDbKey };
+}
 
 void writeU32LE(std::ofstream& out, std::uint32_t v)
 {
@@ -70,6 +84,12 @@ void createEmptySchemaDb(const std::filesystem::path& dbPath)
     const int rc{ sqlite3_open(dbPath.string().c_str(), &rawDb) };
     ASSERT_EQ(rc, SQLITE_OK);
     ASSERT_NE(rawDb, nullptr);
+
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
+    ASSERT_EQ(
+        sqlite3_key(rawDb, static_cast<const void*>(testDbKey().data()), static_cast<int>(testDbKey().size())),
+        SQLITE_OK);
+#endif
 
     const char* schemaSql = "CREATE TABLE IF NOT EXISTS vault_header ("
                             " id INTEGER PRIMARY KEY CHECK(id = 1),"
@@ -160,21 +180,22 @@ TEST(SqliteStorageRepository, CreateAndLoadVaultInfoRoundtrips)
     info.kdf = kdf;
     info.encryptedHeader = header;
 
-    repo->createVault(dir, info);
-    const auto loaded{ repo->loadVaultInfo(dir) };
+    repo->createVault(dir, info, testDbKey());
+    const auto loadedKdf{ repo->loadKdfMetadata(dir) };
+    const auto loadedHeader{ repo->loadEncryptedHeader(dir, testDbKey()) };
 
-    EXPECT_EQ(loaded.kdf.policyVersion, kdf.policyVersion);
-    EXPECT_EQ(static_cast<std::uint32_t>(loaded.kdf.algorithm), static_cast<std::uint32_t>(kdf.algorithm));
-    EXPECT_EQ(loaded.kdf.argon2Version, kdf.argon2Version);
-    EXPECT_EQ(loaded.kdf.derivedKeyBytes, kdf.derivedKeyBytes);
-    EXPECT_EQ(loaded.kdf.argon2id.iterations, kdf.argon2id.iterations);
-    EXPECT_EQ(loaded.kdf.argon2id.memoryKiB, kdf.argon2id.memoryKiB);
-    EXPECT_EQ(loaded.kdf.argon2id.parallelism, kdf.argon2id.parallelism);
-    EXPECT_EQ(loaded.kdf.salt, kdf.salt);
+    EXPECT_EQ(loadedKdf.policyVersion, kdf.policyVersion);
+    EXPECT_EQ(static_cast<std::uint32_t>(loadedKdf.algorithm), static_cast<std::uint32_t>(kdf.algorithm));
+    EXPECT_EQ(loadedKdf.argon2Version, kdf.argon2Version);
+    EXPECT_EQ(loadedKdf.derivedKeyBytes, kdf.derivedKeyBytes);
+    EXPECT_EQ(loadedKdf.argon2id.iterations, kdf.argon2id.iterations);
+    EXPECT_EQ(loadedKdf.argon2id.memoryKiB, kdf.argon2id.memoryKiB);
+    EXPECT_EQ(loadedKdf.argon2id.parallelism, kdf.argon2id.parallelism);
+    EXPECT_EQ(loadedKdf.salt, kdf.salt);
 
-    EXPECT_EQ(loaded.encryptedHeader.nonce, header.nonce);
-    EXPECT_EQ(loaded.encryptedHeader.tag, header.tag);
-    EXPECT_EQ(loaded.encryptedHeader.cipherText, header.cipherText);
+    EXPECT_EQ(loadedHeader.nonce, header.nonce);
+    EXPECT_EQ(loadedHeader.tag, header.tag);
+    EXPECT_EQ(loadedHeader.cipherText, header.cipherText);
 
     std::filesystem::remove_all(dir);
 }
@@ -203,9 +224,9 @@ TEST(SqliteStorageRepository, CreateAndLoadAllowsEmptyCiphertext)
     info.kdf = kdf;
     info.encryptedHeader = header;
 
-    repo->createVault(dir, info);
-    const auto loaded{ repo->loadVaultInfo(dir) };
-    EXPECT_TRUE(loaded.encryptedHeader.cipherText.empty());
+    repo->createVault(dir, info, testDbKey());
+    const auto loadedHeader{ repo->loadEncryptedHeader(dir, testDbKey()) };
+    EXPECT_TRUE(loadedHeader.cipherText.empty());
 }
 
 TEST(SqliteStorageRepository, ListAndDeleteBlobs)
@@ -232,18 +253,18 @@ TEST(SqliteStorageRepository, ListAndDeleteBlobs)
     hepatizon::storage::VaultInfo info{};
     info.kdf = kdf;
     info.encryptedHeader = box;
-    repo->createVault(dir, info);
+    repo->createVault(dir, info, testDbKey());
 
-    repo->storeBlob(dir, "k1", box);
-    repo->storeBlob(dir, "k2", box);
+    repo->storeBlob(dir, "k1", box, testDbKey());
+    repo->storeBlob(dir, "k2", box, testDbKey());
 
-    const auto keys{ repo->listBlobKeys(dir) };
+    const auto keys{ repo->listBlobKeys(dir, testDbKey()) };
     EXPECT_EQ(keys.size(), 2U);
 
-    EXPECT_TRUE(repo->deleteBlob(dir, "k1"));
-    EXPECT_FALSE(repo->deleteBlob(dir, "k1"));
+    EXPECT_TRUE(repo->deleteBlob(dir, "k1", testDbKey()));
+    EXPECT_FALSE(repo->deleteBlob(dir, "k1", testDbKey()));
 
-    const auto keys2{ repo->listBlobKeys(dir) };
+    const auto keys2{ repo->listBlobKeys(dir, testDbKey()) };
     EXPECT_EQ(keys2.size(), 1U);
 }
 
@@ -274,7 +295,7 @@ TEST(SqliteStorageRepository, VaultExistsChecksForMetaAndDb)
     hepatizon::storage::VaultInfo info{};
     info.kdf = kdf;
     info.encryptedHeader = header;
-    repo->createVault(dir, info);
+    repo->createVault(dir, info, testDbKey());
     EXPECT_TRUE(repo->vaultExists(dir));
 
     constexpr std::string_view kMetaFile{ "vault.meta" };
@@ -285,7 +306,7 @@ TEST(SqliteStorageRepository, VaultExistsChecksForMetaAndDb)
 
     const auto dir2{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_exists2_") };
     ASSERT_FALSE(dir2.empty());
-    repo->createVault(dir2, info);
+    repo->createVault(dir2, info, testDbKey());
     EXPECT_TRUE(repo->vaultExists(dir2));
     std::filesystem::remove(dir2 / std::filesystem::path{ kDbFile });
     EXPECT_FALSE(repo->vaultExists(dir2));
@@ -304,7 +325,7 @@ TEST(SqliteStorageRepository, CreateVaultRejectsNonDirectoryVaultPath)
     }
 
     hepatizon::storage::VaultInfo info{};
-    EXPECT_THROW(repo->createVault(vaultPath, info), std::invalid_argument);
+    EXPECT_THROW(repo->createVault(vaultPath, info, testDbKey()), std::invalid_argument);
 }
 
 TEST(SqliteStorageRepository, CreateVaultRejectsNonEmptyDirectory)
@@ -319,19 +340,19 @@ TEST(SqliteStorageRepository, CreateVaultRejectsNonEmptyDirectory)
     }
 
     hepatizon::storage::VaultInfo info{};
-    EXPECT_THROW(repo->createVault(dir, info), std::invalid_argument);
+    EXPECT_THROW(repo->createVault(dir, info, testDbKey()), std::invalid_argument);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoThrowsVaultNotFoundWhenMetaMissing)
+TEST(SqliteStorageRepository, LoadKdfMetadataThrowsVaultNotFoundWhenMetaMissing)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_nometa_") };
     ASSERT_FALSE(dir.empty());
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), hepatizon::storage::VaultNotFound);
+    EXPECT_THROW(static_cast<void>(repo->loadKdfMetadata(dir)), hepatizon::storage::VaultNotFound);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoThrowsVaultNotFoundWhenDbMissing)
+TEST(SqliteStorageRepository, LoadEncryptedHeaderThrowsVaultNotFoundWhenDbMissing)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_nodb_") };
@@ -339,10 +360,10 @@ TEST(SqliteStorageRepository, LoadVaultInfoThrowsVaultNotFoundWhenDbMissing)
 
     writeValidMetaFile(dir / "vault.meta");
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), hepatizon::storage::VaultNotFound);
+    EXPECT_THROW(static_cast<void>(repo->loadEncryptedHeader(dir, testDbKey())), hepatizon::storage::VaultNotFound);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoRejectsBadMetaMagic)
+TEST(SqliteStorageRepository, LoadKdfMetadataRejectsBadMetaMagic)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_badmagic_") };
@@ -354,10 +375,10 @@ TEST(SqliteStorageRepository, LoadVaultInfoRejectsBadMetaMagic)
     out.write(kBadMagic.data(), static_cast<std::streamsize>(kBadMagic.size()));
     out.flush();
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(repo->loadKdfMetadata(dir)), std::runtime_error);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoRejectsUnsupportedMetaVersion)
+TEST(SqliteStorageRepository, LoadKdfMetadataRejectsUnsupportedMetaVersion)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_badver_") };
@@ -370,10 +391,10 @@ TEST(SqliteStorageRepository, LoadVaultInfoRejectsUnsupportedMetaVersion)
     writeU32LE(out, 2U);
     out.flush();
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(repo->loadKdfMetadata(dir)), std::runtime_error);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoRejectsTruncatedMetaFile)
+TEST(SqliteStorageRepository, LoadKdfMetadataRejectsTruncatedMetaFile)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_truncmeta_") };
@@ -386,10 +407,10 @@ TEST(SqliteStorageRepository, LoadVaultInfoRejectsTruncatedMetaFile)
     writeU32LE(out, 1U);
     out.flush();
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(repo->loadKdfMetadata(dir)), std::runtime_error);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoRejectsMissingHeaderRow)
+TEST(SqliteStorageRepository, LoadEncryptedHeaderRejectsMissingHeaderRow)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_noheader_") };
@@ -398,10 +419,10 @@ TEST(SqliteStorageRepository, LoadVaultInfoRejectsMissingHeaderRow)
     writeValidMetaFile(dir / "vault.meta");
     createEmptySchemaDb(dir / "vault.db");
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(repo->loadEncryptedHeader(dir, testDbKey())), std::runtime_error);
 }
 
-TEST(SqliteStorageRepository, LoadVaultInfoRejectsInvalidNonceSizeInHeaderRow)
+TEST(SqliteStorageRepository, LoadEncryptedHeaderRejectsInvalidNonceSizeInHeaderRow)
 {
     auto repo{ hepatizon::storage::sqlite::makeSqliteStorageRepository() };
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_badnonce_") };
@@ -414,13 +435,18 @@ TEST(SqliteStorageRepository, LoadVaultInfoRejectsInvalidNonceSizeInHeaderRow)
     ASSERT_EQ(sqlite3_open((dir / "vault.db").string().c_str(), &rawDb), SQLITE_OK);
     ASSERT_NE(rawDb, nullptr);
 
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
+    ASSERT_EQ(sqlite3_key(rawDb, static_cast<const void*>(testDbKey().data()), static_cast<int>(testDbKey().size())),
+              SQLITE_OK);
+#endif
+
     std::vector<std::uint8_t> badNonce(hepatizon::crypto::g_aeadNonceBytes - 1U, 0x00U);
     std::vector<std::uint8_t> tag(hepatizon::crypto::g_aeadTagBytes, 0x01U);
     std::vector<std::uint8_t> ciphertext{};
     insertHeaderRow(rawDb, badNonce, tag, ciphertext);
     sqlite3_close_v2(rawDb);
 
-    EXPECT_THROW(static_cast<void>(repo->loadVaultInfo(dir)), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(repo->loadEncryptedHeader(dir, testDbKey())), std::invalid_argument);
 }
 
 TEST(SqliteStorageRepository, StoreEncryptedHeaderThrowsVaultNotFoundWhenDbMissing)
@@ -430,7 +456,7 @@ TEST(SqliteStorageRepository, StoreEncryptedHeaderThrowsVaultNotFoundWhenDbMissi
     ASSERT_FALSE(dir.empty());
 
     hepatizon::crypto::AeadBox box{};
-    EXPECT_THROW(repo->storeEncryptedHeader(dir, box), hepatizon::storage::VaultNotFound);
+    EXPECT_THROW(repo->storeEncryptedHeader(dir, box, testDbKey()), hepatizon::storage::VaultNotFound);
 }
 
 TEST(SqliteStorageRepository, StoreBlobThrowsVaultNotFoundWhenDbMissing)
@@ -440,7 +466,7 @@ TEST(SqliteStorageRepository, StoreBlobThrowsVaultNotFoundWhenDbMissing)
     ASSERT_FALSE(dir.empty());
 
     hepatizon::crypto::AeadBox box{};
-    EXPECT_THROW(repo->storeBlob(dir, "k", box), hepatizon::storage::VaultNotFound);
+    EXPECT_THROW(repo->storeBlob(dir, "k", box, testDbKey()), hepatizon::storage::VaultNotFound);
 }
 
 TEST(SqliteStorageRepository, DeleteBlobThrowsVaultNotFoundWhenDbMissing)
@@ -449,7 +475,7 @@ TEST(SqliteStorageRepository, DeleteBlobThrowsVaultNotFoundWhenDbMissing)
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_delblob_") };
     ASSERT_FALSE(dir.empty());
 
-    EXPECT_THROW(static_cast<void>(repo->deleteBlob(dir, "k")), hepatizon::storage::VaultNotFound);
+    EXPECT_THROW(static_cast<void>(repo->deleteBlob(dir, "k", testDbKey())), hepatizon::storage::VaultNotFound);
 }
 
 TEST(SqliteStorageRepository, StoreKdfMetadataThrowsVaultNotFoundWhenVaultMissing)
@@ -470,24 +496,29 @@ TEST(SqliteStorageRepository, BlobOperationsThrowOnEmptyKey)
     hepatizon::crypto::KdfMetadata kdf{};
     kdf.derivedKeyBytes = 32;
     hepatizon::storage::VaultInfo info{ kdf, {} };
-    repo->createVault(dir, info);
+    repo->createVault(dir, info, testDbKey());
 
     hepatizon::crypto::AeadBox val{};
 
-    EXPECT_THROW(repo->storeBlob(dir, "", val), std::invalid_argument);
-    EXPECT_THROW((void)repo->loadBlob(dir, ""), std::invalid_argument);
-    EXPECT_THROW((void)repo->deleteBlob(dir, ""), std::invalid_argument);
+    EXPECT_THROW(repo->storeBlob(dir, "", val, testDbKey()), std::invalid_argument);
+    EXPECT_THROW((void)repo->loadBlob(dir, "", testDbKey()), std::invalid_argument);
+    EXPECT_THROW((void)repo->deleteBlob(dir, "", testDbKey()), std::invalid_argument);
 }
 
 TEST(SqliteStorageRepository, LoadBlobHandlesCorruptedDatabaseRows)
 {
 
     const auto dir{ hepatizon::test_utils::makeSecureTempDir("sqlite_storage_corrupt_") };
-    std::filesystem::create_directories(dir);
     const auto dbPath = dir / "vault.db";
 
     sqlite3* rawDb{ nullptr };
     ASSERT_EQ(sqlite3_open(dbPath.string().c_str(), &rawDb), SQLITE_OK);
+    ASSERT_NE(rawDb, nullptr);
+
+#if defined(HEPC_STORAGE_USE_SQLCIPHER)
+    ASSERT_EQ(sqlite3_key(rawDb, static_cast<const void*>(testDbKey().data()), static_cast<int>(testDbKey().size())),
+              SQLITE_OK);
+#endif
 
     const char* weakSchema = "CREATE TABLE vault_blobs ("
                              " key TEXT PRIMARY KEY,"
@@ -514,7 +545,7 @@ TEST(SqliteStorageRepository, LoadBlobHandlesCorruptedDatabaseRows)
     kdf.salt[0] = 1;
     writeValidMetaFile(dir / "vault.meta");
 
-    EXPECT_THROW((void)repo->loadBlob(dir, "bad_row"), std::runtime_error);
+    EXPECT_THROW((void)repo->loadBlob(dir, "bad_row", testDbKey()), std::runtime_error);
 }
 
 class SqliteStorageRepositoryTests : public ::testing::Test
@@ -525,8 +556,8 @@ protected:
 
     void SetUp() override
     {
-        vaultDir_ = std::filesystem::temp_directory_path() / ("test_vault_" + std::to_string(std::rand()));
-        std::filesystem::create_directories(vaultDir_);
+        vaultDir_ = hepatizon::test_utils::makeSecureTempDir("test_vault_");
+        ASSERT_FALSE(vaultDir_.empty());
 
         repository_ = hepatizon::storage::sqlite::makeSqliteStorageRepository();
 
@@ -534,7 +565,7 @@ protected:
         std::fill(info.kdf.salt.begin(), info.kdf.salt.end(), static_cast<uint8_t>(0x00));
         info.kdf.policyVersion = 1;
 
-        repository_->createVault(vaultDir_, info);
+        repository_->createVault(vaultDir_, info, testDbKey());
     }
 
     void TearDown() override
@@ -567,9 +598,9 @@ TEST_F(SqliteStorageRepositoryTests, StoreAndLoadBlob)
     const std::string kKey = "unique_key_1";
     auto originalBox = CreateTestBox("secret_payload");
 
-    repository_->storeBlob(vaultDir_, kKey, originalBox);
+    repository_->storeBlob(vaultDir_, kKey, originalBox, testDbKey());
 
-    auto loadedBox = repository_->loadBlob(vaultDir_, kKey);
+    auto loadedBox = repository_->loadBlob(vaultDir_, kKey, testDbKey());
 
     ASSERT_TRUE(loadedBox.has_value());
     EXPECT_EQ(loadedBox->cipherText, originalBox.cipherText);
@@ -583,10 +614,10 @@ TEST_F(SqliteStorageRepositoryTests, UpsertUpdatesExistingKey)
     auto boxV1 = CreateTestBox("version_1");
     auto boxV2 = CreateTestBox("version_2");
 
-    repository_->storeBlob(vaultDir_, kKey, boxV1);
-    repository_->storeBlob(vaultDir_, kKey, boxV2);
+    repository_->storeBlob(vaultDir_, kKey, boxV1, testDbKey());
+    repository_->storeBlob(vaultDir_, kKey, boxV2, testDbKey());
 
-    auto result = repository_->loadBlob(vaultDir_, kKey);
+    auto result = repository_->loadBlob(vaultDir_, kKey, testDbKey());
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->cipherText, boxV2.cipherText);
 }
@@ -594,23 +625,23 @@ TEST_F(SqliteStorageRepositoryTests, UpsertUpdatesExistingKey)
 TEST_F(SqliteStorageRepositoryTests, DeleteBlobRemovesRecord)
 {
     const std::string kKey = "delete_me";
-    repository_->storeBlob(vaultDir_, kKey, CreateTestBox("foo"));
+    repository_->storeBlob(vaultDir_, kKey, CreateTestBox("foo"), testDbKey());
 
-    EXPECT_TRUE(repository_->loadBlob(vaultDir_, kKey).has_value());
+    EXPECT_TRUE(repository_->loadBlob(vaultDir_, kKey, testDbKey()).has_value());
 
-    bool wasDeleted = repository_->deleteBlob(vaultDir_, kKey);
+    bool wasDeleted = repository_->deleteBlob(vaultDir_, kKey, testDbKey());
     EXPECT_TRUE(wasDeleted);
 
-    EXPECT_FALSE(repository_->loadBlob(vaultDir_, kKey).has_value());
+    EXPECT_FALSE(repository_->loadBlob(vaultDir_, kKey, testDbKey()).has_value());
 }
 
 TEST_F(SqliteStorageRepositoryTests, ListKeysReturnsSortedKeys)
 {
-    repository_->storeBlob(vaultDir_, "b_key", CreateTestBox("1"));
-    repository_->storeBlob(vaultDir_, "a_key", CreateTestBox("2"));
-    repository_->storeBlob(vaultDir_, "c_key", CreateTestBox("3"));
+    repository_->storeBlob(vaultDir_, "b_key", CreateTestBox("1"), testDbKey());
+    repository_->storeBlob(vaultDir_, "a_key", CreateTestBox("2"), testDbKey());
+    repository_->storeBlob(vaultDir_, "c_key", CreateTestBox("3"), testDbKey());
 
-    std::vector<std::string> keys = repository_->listBlobKeys(vaultDir_);
+    std::vector<std::string> keys = repository_->listBlobKeys(vaultDir_, testDbKey());
 
     ASSERT_EQ(keys.size(), 3);
     EXPECT_EQ(keys[0], "a_key");
@@ -623,9 +654,8 @@ TEST_F(SqliteStorageRepositoryTests, CreateVaultFailsOnReadOnlyFileSystem)
 #ifdef _WIN32
     GTEST_SKIP() << "Skipping read-only filesystem test on Windows (fs::permissions is unreliable for directories).";
 #else
-    std::filesystem::path readOnlyDir =
-        std::filesystem::temp_directory_path() / ("ro_vault_" + std::to_string(std::rand()));
-    std::filesystem::create_directories(readOnlyDir);
+    const std::filesystem::path readOnlyDir{ hepatizon::test_utils::makeSecureTempDir("ro_vault_") };
+    ASSERT_FALSE(readOnlyDir.empty());
 
     // Remove write permissions
     std::filesystem::permissions(readOnlyDir, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec,
@@ -635,7 +665,7 @@ TEST_F(SqliteStorageRepositoryTests, CreateVaultFailsOnReadOnlyFileSystem)
     std::fill(info.kdf.salt.begin(), info.kdf.salt.end(), static_cast<uint8_t>(0x00));
     info.kdf.policyVersion = 1;
 
-    EXPECT_THROW(repository_->createVault(readOnlyDir, info), std::exception);
+    EXPECT_THROW(repository_->createVault(readOnlyDir, info, testDbKey()), std::exception);
 
     // Cleanup: restore permissions so we can delete the folder
     std::filesystem::permissions(readOnlyDir, std::filesystem::perms::all, std::filesystem::perm_options::replace);

@@ -1,9 +1,16 @@
 #include "DashboardView.hpp"
-#include <QIcon>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QVBoxLayout>
+
+namespace
+{
+constexpr int g_margin = 20;
+constexpr int g_spacing = 15;
+constexpr int g_iconSize = 35;
+} // namespace
 
 DashboardView::DashboardView(hepatizon::core::VaultService& service, QWidget* parent)
     : QWidget(parent), m_service(service)
@@ -13,37 +20,37 @@ DashboardView::DashboardView(hepatizon::core::VaultService& service, QWidget* pa
 
 void DashboardView::setupUi()
 {
-    auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(20, 20, 20, 20);
-    layout->setSpacing(15);
+    auto* layout = new QVBoxLayout(this); // NOLINT(cppcoreguidelines-owning-memory)
+    layout->setContentsMargins(g_margin, g_margin, g_margin, g_margin);
+    layout->setSpacing(g_spacing);
 
-    auto* toolbarLayout = new QHBoxLayout();
+    auto* toolbarLayout = new QHBoxLayout(); // NOLINT(cppcoreguidelines-owning-memory)
 
-    m_searchBar = new QLineEdit(this);
+    m_searchBar = new QLineEdit(this); // NOLINT(cppcoreguidelines-owning-memory)
     m_searchBar->setPlaceholderText("Search...");
-    m_searchBar->setFixedHeight(35);
+    m_searchBar->setFixedHeight(g_iconSize);
     connect(m_searchBar, &QLineEdit::textChanged, this, &DashboardView::onSearchChanged);
 
-    m_btnAdd = new QPushButton(QIcon(":/icons/add.svg"), "", this);
-    m_btnAdd->setFixedSize(35, 35);
+    m_btnAdd = new QPushButton(QIcon(":/icons/add.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    m_btnAdd->setFixedSize(g_iconSize, g_iconSize);
     m_btnAdd->setCursor(Qt::PointingHandCursor);
     m_btnAdd->setObjectName("IconButton");
     connect(m_btnAdd, &QPushButton::clicked, this, &DashboardView::addClicked);
 
-    m_btnLock = new QPushButton(QIcon(":/icons/lock.svg"), "", this);
-    m_btnLock->setFixedSize(35, 35);
+    m_btnLock = new QPushButton(QIcon(":/icons/lock.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    m_btnLock->setFixedSize(g_iconSize, g_iconSize);
     m_btnLock->setCursor(Qt::PointingHandCursor);
     m_btnLock->setObjectName("IconButton");
     connect(m_btnLock, &QPushButton::clicked, this, &DashboardView::lockClicked);
 
-    m_btnSettings = new QPushButton(QIcon(":/icons/settings.svg"), "", this);
-    m_btnSettings->setFixedSize(35, 35);
+    m_btnSettings = new QPushButton(QIcon(":/icons/settings.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    m_btnSettings->setFixedSize(g_iconSize, g_iconSize);
     m_btnSettings->setCursor(Qt::PointingHandCursor);
     m_btnSettings->setObjectName("IconButton");
     connect(m_btnSettings, &QPushButton::clicked, this, &DashboardView::settingsClicked);
 
-    m_btnDelete = new QPushButton(QIcon(":/icons/delete.svg"), "", this);
-    m_btnDelete->setFixedSize(35, 35);
+    m_btnDelete = new QPushButton(QIcon(":/icons/delete.svg"), "", this); // NOLINT(cppcoreguidelines-owning-memory)
+    m_btnDelete->setFixedSize(g_iconSize, g_iconSize);
     m_btnDelete->setCursor(Qt::PointingHandCursor);
     m_btnDelete->setObjectName("IconButton");
     m_btnDelete->setEnabled(false);
@@ -56,7 +63,7 @@ void DashboardView::setupUi()
     toolbarLayout->addWidget(m_btnSettings);
     layout->addLayout(toolbarLayout);
 
-    m_listWidget = new QListWidget(this);
+    m_listWidget = new QListWidget(this); // NOLINT(cppcoreguidelines-owning-memory)
     m_listWidget->setFrameShape(QFrame::NoFrame);
     m_listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     connect(m_listWidget, &QListWidget::itemClicked, this, &DashboardView::onItemClicked);
@@ -66,8 +73,8 @@ void DashboardView::setupUi()
 
 void DashboardView::loadVault(std::shared_ptr<hepatizon::core::Session> session, std::filesystem::path path)
 {
-    m_session = session;
-    m_vaultPath = path;
+    m_session = std::move(session);
+    m_vaultPath = std::move(path);
     m_searchBar->clear();
     refreshList();
     m_btnDelete->setEnabled(false);
@@ -77,7 +84,9 @@ void DashboardView::refreshList()
 {
     m_listWidget->clear();
     if (!m_session)
+    {
         return;
+    }
 
     auto result = m_service.listSecretKeys(m_vaultPath, m_session->vault());
 
@@ -108,7 +117,7 @@ void DashboardView::onSearchChanged(const QString& text)
 void DashboardView::onItemClicked(QListWidgetItem* item)
 {
     m_btnDelete->setEnabled(item != nullptr);
-    if (item)
+    if (item != nullptr)
     {
         emit secretClicked(item->text().toStdString());
     }
@@ -117,14 +126,13 @@ void DashboardView::onItemClicked(QListWidgetItem* item)
 void DashboardView::onDeleteClicked()
 {
     auto* selectedItem = m_listWidget->currentItem();
-    if (!selectedItem)
+    if (selectedItem == nullptr)
     {
         return;
     }
 
     const auto reply = QMessageBox::question(this, "Confirm Delete",
-                                             tr("Are you sure you want to delete '%1'?")
-                                                 .arg(selectedItem->text()),
+                                             tr("Are you sure you want to delete '%1'?").arg(selectedItem->text()),
                                              QMessageBox::Yes | QMessageBox::No);
 
     if (reply != QMessageBox::Yes)

@@ -29,7 +29,7 @@ private slots:
     void onItemClicked(QListWidgetItem* item);
     void onDeleteClicked();
 
-private:
+private: // NOLINT(readability-redundant-access-specifiers)
     void setupUi();
     void refreshList();
 

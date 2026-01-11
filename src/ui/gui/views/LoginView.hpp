@@ -28,7 +28,7 @@ private slots:
     void onCreateClicked();
     void togglePasswordVisibility();
 
-private:
+private: // NOLINT(readability-redundant-access-specifiers)
     void setupUi();
     template <typename Func> bool processPasswordAndExecute(Func action);
 

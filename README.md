@@ -2,16 +2,11 @@
 
 HepatizonCore is a modular password manager prototype in C++20 (pet / learning project). It features a secure core architecture, an interactive CLI shell, and a Qt 6 GUI.
 
-> **Status (2026-01-10):**
-> * **Core:** Security primitives, Argon2id KDF, Crypto providers (Native + OpenSSL), VaultService (create/open/rekey).
-> * **GUI:** Qt 6 app with login, dashboard, add‑secret, secret view/copy, and settings (auto‑lock + clipboard + password change).
-> * **System:** Partial WSLg support with specific fixes for window positioning (xcb) and system tray fallbacks.
-> * **Quality:** Integrated Testing (GTest + QtTest) and automated Code Coverage (gcovr).
 
 ## ⚠️ Disclaimer
 **This is a learning project, not a tool for daily use.**
 
-I built Hepatizon to practice writing clean, strict C++ code, and to learn more about the Qt framework. It is not a tool for daily use.
+I built Hepatizon to practice  C++. It is not a tool for daily use.
 
 **Do not trust this with your real passwords.** I am not responsible for any data loss. Use this repo to review the code and architecture, not to store your secrets.
 
@@ -44,31 +39,6 @@ I built Hepatizon to practice writing clean, strict C++ code, and to learn more 
 - Tests: Google Test
 - Data: SQLite3 (via vcpkg; used by the storage adapter). On Windows the adapter can be built against SQLCipher with `-DHEPC_STORAGE_USE_SQLCIPHER=ON`.
 
-**Planned**
-- Data: nlohmann/json
-
----
-
-## Architecture (conceptual)
-```
-[ CLI / GUI ] (composition roots)
-        |
-        v
-[ HepatizonCore ]
-        |
-        v
-[ Ports (include/hepatizon) ]
-  |-- ICryptoProvider  <--- HepatizonNative / HepatizonOpenSSL
-  |-- IStorageRepository <--- storage adapters (SQLite/JSON/...)
-
-Security primitives (secure wipe, secure random, secure containers) are always available to core and adapters.
-
-KDF metadata is stored alongside the vault. Core defines default KDF policy/parameters, while crypto providers implement `deriveMasterKey(...)` from the persisted metadata.
-```
-
-For the target-level structure and dependency rules, see `STRUCTURE.md`.
-
----
 
 ## Project layout (WIP)
 - `include/hepatizon/` public interfaces and shared types
@@ -78,35 +48,6 @@ For the target-level structure and dependency rules, see `STRUCTURE.md`.
 - `tests/` unit, integration, fixtures (GTest)
 - `scripts/` helpers (e.g., windeployqt)
 
-Example layout:
-```
-HepatizonCore/
-├── include/
-│   └── hepatizon/
-│       ├── core/
-│       ├── crypto/
-│       ├── storage/
-│       └── security/
-├── third_party/
-│   └── monocypher/
-├── vcpkg/
-├── src/
-│   ├── core/
-│   ├── crypto/
-│   │   ├── native/
-│   │   └── openssl/
-│   ├── storage/
-│   │   ├── sqlite/
-│   │   └── json/
-│   ├── security/
-│   ├── ui/
-│   │   ├── cli/
-│   │   └── gui/
-│   └── platform/
-└── tests/
-    ├── unit/
-    └── integration/
-```
 
 ## Session + security policy (current)
 - Core provides a `Session` wrapper (timeout + activity tracking). UI drives the timer (QTimer) and calls `Session::touch()` on input events.
@@ -128,7 +69,7 @@ The current SQLite adapter persists a single encrypted “vault header” row (`
 ---
 
 ## Building
-Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1. CI installs Qt on Ubuntu via distro packages and exports `QT6_PREFIX` for CMake presets.
+Prereqs: a C++20 compiler, CMake, and (for GUI) Qt 6.10.1. 
 If vcpkg complains about your CMake being too old, just install the version it asks for (on Windows I hit a requirement for 3.31.10).
 
 Note: OpenSSL is optional. Enable the OpenSSL provider with `-DHEPC_ENABLE_OPENSSL=ON` (requires OpenSSL).
@@ -186,10 +127,3 @@ Use the helper to bundle Qt DLLs/plugins next to the executable:
 pwsh scripts/windeployqt.ps1 -BuildDir out/build/windows-release-msvc -Config Release -QtRoot "C:/Qt/6.10.1/msvc2022_64"
 ```
 This invokes `windeployqt --compiler-runtime` for the built `hepatizoncore_gui.exe`.
-
----
-
-## Next steps (planned)
-- Flesh out interfaces in `include/` and implementations in `src/`
-- Add storage/crypto backends wiring and session/keyfile handling
-- Expand tests (unit/integration) and CI matrix for Linux/Windows
